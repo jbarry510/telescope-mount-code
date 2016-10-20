@@ -48,12 +48,13 @@ def send_recieve(send, recieve):
         #print (recv_bytes[byte])
     
     # convert recieved bytes into a single number
-    return_data = 0
-    for byte in range(0,recieve):
-        print("byte ", byte, "is ", recv_bytes[byte])
-        return_data += (list(reversed(recv_bytes))[byte])<<(8*byte)
-        print("return data is now ", return_data)
-    return return_data
+    #return_data = 0
+    #for byte in range(0,recieve):
+    #    print("byte ", byte, "is ", recv_bytes[byte])
+    #   return_data += (list(reversed(recv_bytes))[byte])<<(8*byte)
+    #    print("return data is now ", return_data)
+    #return return_data
+    return recv_bytes
 
 # sender helper
 def __send_byte (byte, chipsel):
