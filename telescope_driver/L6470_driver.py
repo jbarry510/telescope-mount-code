@@ -82,8 +82,10 @@ class L6470:
             a new instance of an L6470 object.
     """
     def __init__(self, spi_handler):
-        # do init stuff and create personal vars
         self.spi = spi_handler
+        if not hasattr(self.spi,'send_recieve'):
+            print ('Invalid SPI object.')
+            raise AttributeError
     
     def __del__(self):
         # stuff to do if/when this instance is being deleted
@@ -95,18 +97,19 @@ class L6470:
     # === L6470 FUNCTION WRAPPERS ===
     def NOP (self):
         """ No-Operation command. Does nothing.
-    """
+        """
         # ze goggles
-        # should send (0b00000000)
+        spi.send_recieve(0,0)
     
-    def SetParam (self, register, param):
+    def SetParam (self, register, value):
         """ Writes the value <param> to the register named <register>.
         Args:
             register (string): A name corresponding to an entry in REGISTER_DICT.
-            param (int): The new value to write to that register.
+            value (int): The new value to write to that register.
         """
-        address = REGISTER_DICT[register]
-        # should send (0 & address), then (param)
+        address = L6470.REGISTER_DICT[register]
+        self.spi.__send_byte(0b00000000 + register)
+        spi.send_recieve(value,0)
     
     def GetParam (self, register):
         """ Reads the value of the register named <register>.
@@ -115,9 +118,10 @@ class L6470:
         Returns:
             value (byte array): The contents of the selected register.
         """
-        address = REGISTER_DICT[register]
-        # should send (0b00100000 & address)
-        # return some_value
+        address = L6470.REGISTER_DICT[register]
+        self.spi.__send_byte(0b00100000 + address)
+        value = self.spi.send_recieve(0,3)
+        return value
     
     def Run (self, speed, direction):
         """ Sets the target <speed> and <direction>. BUSY flag is low until the
@@ -302,6 +306,8 @@ class L6470:
         """ Returns the value of the STATUS register, and forces the system to
                 exit from any error state. This command does not reset the Hi-Z
                 or BUSY flags.
+        Returns:
+            status (bytearray): the two-byte value of the register.
         """
         # should send (0b11010000)
         
