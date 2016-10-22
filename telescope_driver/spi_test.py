@@ -51,13 +51,13 @@ def send_recieve(send, send_len, recieve_len):
         #print (recv_bytes[byte])
     
     # convert recieved bytes into a single number
-    #return_data = 0
-    #for byte in range(0,recieve):
-    #    print("byte ", byte, "is ", recv_bytes[byte])
-    #   return_data += (list(reversed(recv_bytes))[byte])<<(8*byte)
-    #    print("return data is now ", return_data)
-    #return return_data
-    return recv_bytes
+    return_data = 0
+    for byte in range(0,math_ceil(recieve_len/8)):
+        # shift previous values over to make room
+        return_data = return_data << 8
+        # add the new byte in
+        return_data += recv_bytes[byte]
+    return return_data
 
 # sender helper
 def __send_byte (byte, chipsel):
