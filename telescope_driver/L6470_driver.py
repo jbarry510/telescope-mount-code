@@ -54,25 +54,25 @@ class L6470:
     """ Dictionary for the STATUS register. Contains all error flags,
             as well as basic motor state information.
     """
-    STATUS_DICT = {} #        [BIT ADDR | OK/DEFAULT VALUE]
-    STATUS_DICT['STEP_LOSS_B'] = [0x4000,1] # stall detection on bridge B
-    STATUS_DICT['STEP_LOSS_A'] = [0x2000,1] # stall detection on bridge A
-    STATUS_DICT['OVERCURRENT'] = [0x1000,1] # OCD, overcurrent detection
-    STATUS_DICT['HEAT_SHUTDN'] = [0x0800,1] # TH_SD, thermal shutdown
-    STATUS_DICT['HEAT_WARN'  ] = [0x0400,1] # TH_WN, thermal warning
-    STATUS_DICT['UNDERVOLT'  ] = [0x0200,1] # UVLO, low drive supply voltage
-    STATUS_DICT['WRONG_CMD'  ] = [0x0100,0] # Unknown command
-    STATUS_DICT['NOTPERF_CMD'] = [0x0080,0] # Command can't be performed
+    STATUS_DICT = {} # [    NAME    | OK/DEFAULT VALUE ]
+    STATUS_DICT[14] = ['STEP_LOSS_B',1] # stall detection on bridge B
+    STATUS_DICT[13] = ['STEP_LOSS_A',1] # stall detection on bridge A
+    STATUS_DICT[12] = ['OVERCURRENT',1] # OCD, overcurrent detection
+    STATUS_DICT[11] = ['HEAT_SHUTDN',1] # TH_SD, thermal shutdown
+    STATUS_DICT[10] = ['HEAT_WARN  ',1] # TH_WN, thermal warning
+    STATUS_DICT[ 9] = ['UNDERVOLT  ',1] # UVLO, low drive supply voltage
+    STATUS_DICT[ 8] = ['WRONG_CMD  ',0] # Unknown command
+    STATUS_DICT[ 7] = ['NOTPERF_CMD',0] # Command can't be performed
     
-    STATUS_DICT['SWITCH_EDGE'] = [0x0008,0] # SW_EVN, signals switch falling edge
-    STATUS_DICT['SWITCH_FLAG'] = [0x0004,0] # switch state. 0=open, 1=grounded
+    STATUS_DICT[ 3] = ['SWITCH_EDGE',0] # SW_EVN, signals switch falling edge
+    STATUS_DICT[ 2] = ['SWITCH_FLAG',0] # switch state. 0=open, 1=grounded
     
-    STATUS_DICT['STEPCK_MODE'] = [0x8000,0] # 1=step-clock mode, 0=normal
-    STATUS_DICT['DIRECTION'  ] = [0x0010,1] # 1=forward, 0=reverse
-    STATUS_DICT['MOTOR_STAT' ] = [0x0040,0] # two bits: 00=stopped, 01=accel
+    STATUS_DICT[15] = ['STEPCK_MODE',0] # 1=step-clock mode, 0=normal
+    STATUS_DICT[ 4] = ['DIRECTION'  ,1] # 1=forward, 0=reverse
+    STATUS_DICT[ 6] = ['MOTOR_STAT' ,0] # two bits: 00=stopped, 01=accel
                                             #           10=decel,   11=const spd
-    STATUS_DICT['BUSY'       ] = [0x0002,1] # low during movement commands
-    STATUS_DICT['Hi-Z'       ] = [0x0001,1] # 1=hi-Z, 0=motor active
+    STATUS_DICT[ 1] = ['BUSY'       ,1] # low during movement commands
+    STATUS_DICT[ 0] = ['Hi-Z'       ,1] # 1=hi-Z, 0=motor active
     
     # === CORE FUNCTIONS ===
     """ Create a new L6470 instance.
@@ -306,14 +306,71 @@ class L6470:
         """
         # should send (0b10101000)
     
-    def GetStatus (self):
+    def GetStatus (self, verbose=0):
         """ Returns the value of the STATUS register, and forces the system to
                 exit from any error state. This command does not reset the Hi-Z
                 or BUSY flags.
+        Args:
+            verbose (optional int): If this is not zero, the command will print.
         Returns:
             status (bytearray): the two-byte value of the register.
         """
-        # should send (0b11010000)
+        status = self.spi.send_recieve(0b11010000,1,16)
+        if not verbose:
+            return status
+        # === ELSE BEGIN HORROR ===
+        # check error flags
+        print ("Driver Status: ", bin(status))
+        for bit_addr in range(7,15):
+            print("  Flag ", self.STATUS_DICT[bit_addr][0], ": ", end="")
+            # we shift a 1 to the bit address, then shift the result down again
+            if ((status & 1<<bit_addr)>>bit_addr)==self.STATUS_DICT[bit_addr][1]:
+                # the result should either be a 1 or 0. Which is 'ok' depends.
+                print("ok")
+            else:
+                print("Alert!")
         
-    
+        # check SCK_MOD
+        if status & (1<<15):
+            print("  Step-clock mode is on.")
+        else:
+            print("  Step-clock mode is off.")
+        
+        # check MOT_STATUS
+        if status & (1<<6):
+            if status & (1<<5):
+                print("  Motor is at constant speed.")
+            else:
+                print("  Motor is decelerating.")
+        else:
+            if status & (1<<5):
+                print("  Motor is accelerating.")
+            else:
+                print("  Motor is stopped.")
+        # check DIR
+        if status & (1<<4):
+            print("  Motor direction is set to forward.")
+        else:
+            print("  Motor direction is set to reverse.")
+        # check BUSY
+        if not (status & (1<<1)):
+            print("  Motor is busy with a movement command.")
+        else:
+            print("  Motor is ready to recieve movement commands.")
+        # check HiZ
+        if status & 1:
+            print("  Bridges are in high-impedance mode (disabled).")
+        else:
+            print("  Bridges are in low-impedance mode (active).")
+        
+        # check SW_EVEN flag
+        if status & (1<<3):
+            print("  External switch has been clicked since last check.")
+        else:
+            print("  External switch has no activity to report.")
+        # check SW_F
+        if status & (1<<2):
+            print("  External switch is closed (grounded).")
+        else:
+            print("  External switch is open.")
 
