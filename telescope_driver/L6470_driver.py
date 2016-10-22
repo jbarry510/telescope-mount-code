@@ -10,6 +10,8 @@ Attributes:
 
 
 """
+from math import ceil as math_ceil
+
 class L6470:
     """ This class represents an L6470 stepper driver.
             Contains representations of all valid commands,
@@ -111,8 +113,9 @@ class L6470:
             value (int): The new value to write to that register.
         """
         regdata = L6470.REGISTER_DICT[register]
+        send_len = math_ceil(regdata[1]/8)
         self.spi.send_recieve(0b00000000 + regdata[0], 1, 0)
-        self.spi.send_recieve(value, regdata[1], 0)
+        self.spi.send_recieve(value, send_len, 0)
     
     def GetParam (self, register):
         """ Reads the value of the register named <register>.
@@ -123,7 +126,9 @@ class L6470:
         """
         regdata = L6470.REGISTER_DICT[register]
         cmd = 0b00100000 + regdata[0]
-        value = self.spi.send_recieve(cmd, regdata[1], regdata[1])
+        send_len = math_ceil(regdata[1]/8)
+        recv_len = send_len
+        value = self.spi.send_recieve(cmd, send_len, recv_len)
         return value
     
     def Run (self, speed, direction):
@@ -141,8 +146,8 @@ class L6470:
             return -1 # invalid argument
         if speed < 0:# or speed > :
             return -1 # invalid argument
-        cmd = ((0b01010000 + direction)<<8) + speed
-        self.spi.send_recieve(cmd,2,0)
+        self.spi.send_recieve(0b01010000 + direction,1,0)
+        self.spi.send_recieve(speed,3,0)
         return 0
     
     def StepClock (self, direction):
@@ -162,7 +167,7 @@ class L6470:
         """
         if (direction != 1) and (direction != 0):
             return -1 # unpermitted behavior
-        # should send (0b01011000 & direction)
+        self.spi.send_recieve(0b01011000 + direction,1,0)
     
     def Move (self, steps, direction):
         """ Moves a number of microsteps in a given direction. The units of
@@ -179,7 +184,8 @@ class L6470:
         """
         if (direction != 1) and (direction != 0):
             return -1 # unpermitted behavior
-        # should send (0b01000000 & direction), then (steps)
+        self.spi.send_recieve(0b01000000 + direction,1,0)
+        self.spi.send_recieve(steps,3,0)
     
     def GoTo (self, position):
         """ Brings motor to the step count of <position> via the minimum path.
@@ -190,7 +196,8 @@ class L6470:
         Args:
             position (int): the absolute position to rotate to.
         """
-        # should send (0b01100000), then (position)
+        self.spi.send_recieve(0b01100000,1,0)
+        self.spi.send_recieve(position,3,0)
     
     def GoTo_DIR (self, position, direction):
         """ Brings motor to the step count of <position>, forcing <direction>.
@@ -206,7 +213,9 @@ class L6470:
         """
         if (direction != 1) and (direction != 0):
             return -1 # unpermitted behavior
-        # should send (0b01101000 & direction), then (position)
+        cmd = 0b01101000 + direction
+        self.spi.send_recieve(cmd,1,0)
+        self.spi.send_recieve(position,3,0)
     
     def GoUntil (self, speed, action, direction):
         """ Performs a motion in <direction> at <speed> until Switch is closed,
@@ -227,7 +236,7 @@ class L6470:
             return -1 # unpermitted behavior
         if (direction != 1) and (direction != 0):
             return -1 # unpermitted behavior
-        # should send (0b10000010 & action & direction) (action is 0b0000X000)
+        self.spi.send_recieve(0b01000010 + (action<<3) + direction,1,0)
     
     def ReleaseSW (self, action, direction):
         """ Performs a motion in <direction> at minimum speed until Switch is
@@ -247,7 +256,7 @@ class L6470:
             return -1 # unpermitted behavior
         if (direction != 1) and (direction != 0):
             return -1 # unpermitted behavior
-        # should send (0b10010010 & action & direction) (action is 0b0000X000)
+        self.spi.send_recieve(0b01110000 + (action<<3) + direction,1,0)
     
     def GoHome (self):
         """ Brings the motor to the HOME position (ABS_POS == 0) via the shortest
@@ -257,24 +266,24 @@ class L6470:
                 given only when the previous command is completed- if BUSY is low
                 when this command is called, the NOTPERF_CMD flag will raise.
         """
-        # should send (0b01110000)
+        self.spi.send_recieve(0b01110000,1,0)
     
     def GoMark (self):
         """ Brings the motor to the MARK position via the minimum path. Note 
                 that this command is equivalent to using GoTo with the value of
                 the MARK register. Use GoTo_DIR() if a direction is mandatory.
         """
-        # should send (0b01111000)
+        self.spi.send_recieve(0b01111000,1,0)
     
     def ResetPos (self):
         """ Resets the ABS_POS register to zero (ie, sets HOME position).
         """
-        # should send (0b11011000)
+        self.spi.send_recieve(0b11011000,1,0)
     
     def ResetDevice (self):
         """ Resets the L6470 chip to power-up conditions.
         """
-        # should send (0b11000000)
+        self.spi.send_recieve(0b11000000,1,0)
     
     def SoftStop (self):
         """ Stops the motor, using the value of the DEC register as the
@@ -283,28 +292,28 @@ class L6470:
                 be run any time and runs immediately- the BUSY flag will be held
                 low until the motor stops.
         """
-        # should send (0b10110000)
+        self.spi.send_recieve(0b10110000,1,0)
     
     def HardStop (self):
         """ Stops the motor immediately, with infinite deceleration. This 
                 command interacts with the Hi-Z state and the BUSY flag just
                 like SoftStop().
         """
-        # should send (0b10111000)
+        self.spi.send_recieve(0b10111000,1,0)
     
     def SoftHiZ (self):
         """ Puts bridges into Hi-Z after a deceleration phase using the value of
                 the DEC register. This command can be run at any time and is
                 immediately executed, and holds BUSY low until the motor stops.
         """
-        # should send (0b10100000)
+        self.spi.send_recieve(0b10100000,1,0)
     
     def HardHiZ (self):
         """ Puts bridges into hi-z immediately, ignoring the DEC parameter. This
                 command can be run any time and immediately executes, holding 
                 BUSY low until the motor stops.
         """
-        # should send (0b10101000)
+        self.spi.send_recieve(0b10101000,1,0)
     
     def GetStatus (self, verbose=0):
         """ Returns the value of the STATUS register, and forces the system to
@@ -313,14 +322,14 @@ class L6470:
         Args:
             verbose (optional int): If this is not zero, the command will print.
         Returns:
-            status (bytearray): the two-byte value of the register.
+            status (int): the two-byte value of the register.
         """
-        status = self.spi.send_recieve(0b11010000,1,16)
+        status = self.spi.send_recieve(0b11010000,1,2)
         if not verbose:
             return status
         # === ELSE BEGIN HORROR ===
         # check error flags
-        print ("Driver Status: ", bin(status))
+        print ("Driver Status: ")#, bin(status))
         for bit_addr in range(7,15):
             print("  Flag ", self.STATUS_DICT[bit_addr][0], ": ", end="")
             # we shift a 1 to the bit address, then shift the result down again
