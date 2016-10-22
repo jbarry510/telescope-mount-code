@@ -20,36 +20,36 @@ class L6470:
     # === DICTIONARIES ===
     """ Dictionary of available registers and their addresses.
     """
-    REGISTER_DICT = {} # Register Table:   DESCRIPTION   | xRESET | BIT LEN | ?
-    REGISTER_DICT['ABS_POS'   ]= 0x01 # current position | 000000 |   22    | S
-    REGISTER_DICT['EL_POS'    ]= 0x02 # Electrical pos   |    000 |    9    | S
-    REGISTER_DICT['MARK'      ]= 0x03 # mark position    | 000000 |   22    | W
-    REGISTER_DICT['SPEED'     ]= 0x04 # current speed    |  00000 |   20    | 
-    REGISTER_DICT['ACC'       ]= 0x05 # accel limit      |    08A |   12    | W
-    REGISTER_DICT['DEC'       ]= 0x06 # decel limit      |    08A |   12    | W
-    REGISTER_DICT['MAX_SPEED' ]= 0x07 # maximum speed    |    041 |   10    | W
-    REGISTER_DICT['MIN_SPEED' ]= 0x08 # minimum speed    |      0 |   13    | S
-    REGISTER_DICT['FS_SPD'    ]= 0x15 # full-step speed  |    027 |   10    | W
-    REGISTER_DICT['KVAL_HOLD' ]= 0x09 # holding Kval     |     29 |    8    | W
-    REGISTER_DICT['KVAL_RUN'  ]= 0x0A # const speed Kval |     29 |    8    | W
-    REGISTER_DICT['KVAL_ACC'  ]= 0x0B # accel start Kval |     29 |    8    | W
-    REGISTER_DICT['KVAL_DEC'  ]= 0x0C # decel start Kval |     29 |    8    | W
-    REGISTER_DICT['INT_SPEED' ]= 0x0D # intersect speed  |   0408 |   14    | H
-    REGISTER_DICT['ST_SLP'    ]= 0x0E # start slope      |     19 |    8    | H
-    REGISTER_DICT['FN_SLP_ACC']= 0x0F # accel end slope  |     29 |    8    | H
-    REGISTER_DICT['FN_SLP_DEC']= 0x10 # decel end slope  |     29 |    8    | H
-    REGISTER_DICT['K_THERM'   ]= 0x11 # therm comp factr |      0 |    4    | H
-    REGISTER_DICT['ADC_OUT'   ]= 0x12 # ADC output       |     XX |    5    | 
-    REGISTER_DICT['OCD_TH'    ]= 0x13 # OCD threshold    |      8 |    4    | W
-    REGISTER_DICT['STALL_TH'  ]= 0x14 # STALL threshold  |     40 |    7    | W
-    REGISTER_DICT['STEP_MODE' ]= 0x16 # Step mode        |      7 |    8    | H
-    REGISTER_DICT['ALARM_EN'  ]= 0x17 # Alarm enable     |     FF |    8    | S
-    REGISTER_DICT['CONFIG'    ]= 0x18 # IC configuration |   2E88 |   16    | H
-    REGISTER_DICT['STATUS'    ]= 0x19 # Status           |   XXXX |   16    |
-    REGISTER_DICT['RESERVED A']= 0x1A # RESERVED         |        |         | X
-    REGISTER_DICT['RESERVED B']= 0x1B # RESERVED         |        |         | X
-    # ? (Remarks): X = unreadable, W = Writable (always), 
-    #              S = Writable (when stopped), H = Writable (when Hi-Z)
+    REGISTER_DICT = {} #        ADDR | LEN |  DESCRIPTION     | xRESET | Write
+    REGISTER_DICT['ABS_POS'   ]=[0x01, 22] # current pos      | 000000 |   S
+    REGISTER_DICT['EL_POS'    ]=[0x02,  9] # Electrical pos   |    000 |   S
+    REGISTER_DICT['MARK'      ]=[0x03, 22] # mark position    | 000000 |   W
+    REGISTER_DICT['SPEED'     ]=[0x04, 20] # current speed    |  00000 |   R
+    REGISTER_DICT['ACC'       ]=[0x05, 12] # accel limit      |    08A |   W
+    REGISTER_DICT['DEC'       ]=[0x06, 12] # decel limit      |    08A |   W
+    REGISTER_DICT['MAX_SPEED' ]=[0x07, 10] # maximum speed    |    041 |   W
+    REGISTER_DICT['MIN_SPEED' ]=[0x08, 13] # minimum speed    |      0 |   S
+    REGISTER_DICT['FS_SPD'    ]=[0x15, 10] # full-step speed  |    027 |   W
+    REGISTER_DICT['KVAL_HOLD' ]=[0x09,  8] # holding Kval     |     29 |   W
+    REGISTER_DICT['KVAL_RUN'  ]=[0x0A,  8] # const speed Kval |     29 |   W
+    REGISTER_DICT['KVAL_ACC'  ]=[0x0B,  8] # accel start Kval |     29 |   W
+    REGISTER_DICT['KVAL_DEC'  ]=[0x0C,  8] # decel start Kval |     29 |   W
+    REGISTER_DICT['INT_SPEED' ]=[0x0D, 14] # intersect speed  |   0408 |   H
+    REGISTER_DICT['ST_SLP'    ]=[0x0E,  8] # start slope      |     19 |   H
+    REGISTER_DICT['FN_SLP_ACC']=[0x0F,  8] # accel end slope  |     29 |   H
+    REGISTER_DICT['FN_SLP_DEC']=[0x10,  8] # decel end slope  |     29 |   H
+    REGISTER_DICT['K_THERM'   ]=[0x11,  4] # therm comp factr |      0 |   H
+    REGISTER_DICT['ADC_OUT'   ]=[0x12,  5] # ADC output       |     XX |
+    REGISTER_DICT['OCD_TH'    ]=[0x13,  4] # OCD threshold    |      8 |   W
+    REGISTER_DICT['STALL_TH'  ]=[0x14,  7] # STALL threshold  |     40 |   W
+    REGISTER_DICT['STEP_MODE' ]=[0x16,  8] # Step mode        |      7 |   H
+    REGISTER_DICT['ALARM_EN'  ]=[0x17,  8] # Alarm enable     |     FF |   S
+    REGISTER_DICT['CONFIG'    ]=[0x18, 16] # IC configuration |   2E88 |   H
+    REGISTER_DICT['STATUS'    ]=[0x19, 16] # Status           |   XXXX |
+    REGISTER_DICT['RESERVED A']=[0x1A,  0] # RESERVED         |        |   X
+    REGISTER_DICT['RESERVED B']=[0x1B,  0] # RESERVED         |        |   X
+    # Write: X = unreadable, W = Writable (always), 
+    #        S = Writable (when stopped), H = Writable (when Hi-Z)
     
     """ Dictionary for the STATUS register. Contains all error flags,
             as well as basic motor state information.
@@ -94,12 +94,15 @@ class L6470:
     def test_function(self):
         print ("test passed.")
     
+    # === L6470 HELPER FUNCTIONS ===
+    
+    
     # === L6470 FUNCTION WRAPPERS ===
-    def NOP (self):
+    def Nop (self):
         """ No-Operation command. Does nothing.
         """
         # ze goggles
-        spi.send_recieve(0,0)
+        self.spi.send_recieve(0,1,0)
     
     def SetParam (self, register, value):
         """ Writes the value <param> to the register named <register>.
@@ -107,9 +110,9 @@ class L6470:
             register (string): A name corresponding to an entry in REGISTER_DICT.
             value (int): The new value to write to that register.
         """
-        address = L6470.REGISTER_DICT[register]
-        self.spi.__send_byte(0b00000000 + register)
-        spi.send_recieve(value,0)
+        regdata = L6470.REGISTER_DICT[register]
+        self.spi.send_recieve(0b00000000 + regdata[0], 1, 0)
+        self.spi.send_recieve(value, regdata[1], 0)
     
     def GetParam (self, register):
         """ Reads the value of the register named <register>.
@@ -118,9 +121,9 @@ class L6470:
         Returns:
             value (byte array): The contents of the selected register.
         """
-        address = L6470.REGISTER_DICT[register]
-        self.spi.__send_byte(0b00100000 + address)
-        value = self.spi.send_recieve(0,3)
+        regdata = L6470.REGISTER_DICT[register]
+        cmd = 0b00100000 + regdata[0]
+        value = self.spi.send_recieve(cmd, regdata[1], regdata[1])
         return value
     
     def Run (self, speed, direction):
@@ -136,9 +139,10 @@ class L6470:
         """
         if (direction != 1) and (direction != 0):
             return -1 # invalid argument
-        if speed < 0:
+        if speed < 0:# or speed > :
             return -1 # invalid argument
-        # should send (0b01010000 & direction), then (speed)
+        cmd = ((0b01010000 + direction)<<8) + speed
+        self.spi.send_recieve(cmd,2,0)
         return 0
     
     def StepClock (self, direction):
