@@ -1,0 +1,25 @@
+# The exact commands I'm running on the board to test SPI and L6470.
+
+# Soft-reset the STM's python environment. This is ctrl-D, not '^ D'
+^D
+
+# Import the modules we need. The L6470's been imported by 'main.py'
+import stmspi
+from pyb import Pin
+
+# create the SPI device. Note: The bus will be off. Default setup is ok.
+device = stmspi.SPIDevice(2,Pin.cpu.E7)
+
+# create the motor object.
+motor = L6470(device)
+
+# check everything's ok. This may say 'undervolt alert' but that's a reset thing.
+# Just make sure the L6470 has motor supply power.
+motor.GetStatus(verbose=1)
+
+# Finally spin the motor. This is actually really slow.
+motor.Run(4000,1)
+
+# Stop the motor and make everything safe.
+motor.SoftStop()
+motor.SoftHiZ()
