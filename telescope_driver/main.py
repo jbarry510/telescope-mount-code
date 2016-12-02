@@ -50,7 +50,7 @@ class MotorTask:
             if stat == 0 or stat == 65535:
                 print('Cannot connect to',self.name,'- Is motor power on?')
                 return
-            if (stat & __ERR_CMD_MASK__) and not (stat & __ERR_FLAG_MASK__): # CMD ERR 0 = OK, FLAG ERR 1 = OK
+            if ((stat & __ERR_CMD_MASK__) or not (stat & __ERR_FLAG_MASK__)) != 0: # CMD ERR 0 = OK, FLAG ERR 1 = OK
                 print('Init error for',self.name,':',stat,'. Trying again...')
                 self.state = __STATE_INIT__ # something went wrong, report it and don't activate the motor.
             else:
@@ -66,9 +66,10 @@ class MotorTask:
             # check the cmd_code to see what to do
             
             stat = self.driver.GetStatus()
-            if (stat & __ERR_CMD_MASK__) and not (stat & __ERR_FLAG_MASK__):
+            if ((stat & __ERR_CMD_MASK__) or not (stat & __ERR_FLAG_MASK__)) != 0:
                 self.state = __STATE_ERR__
-                print('Error in driver:', stat)
+                print('Error in',self.name,'driver:','{0:016b}'.format(stat))
+                self.driver.print_status(stat)
                 self.err = stat
 
             if cmd_code.startswith('slew'):
@@ -92,15 +93,17 @@ class MotorTask:
         # --state: error has ocurred--
         elif self.state == __STATE_ERR__:
             stat = self.driver.GetStatus()
-            if not ((stat & __ERR_CMD_MASK__) and not (stat & __ERR_FLAG_MASK__)):
+            if not (stat & __ERR_CMD_MASK__) and ((stat & __ERR_FLAG_MASK__) == __ERR_FLAG_MASK__):
                 self.state = __STATE_WAIT__
                 self.err = 0
 
         # --state: executing command--
         elif self.state == __STATE_BUSY__:
+            self.err = 2 # just notify that we're busy
             stat = self.driver.GetStatus()
             if stat & 1<<1: # BUSY flag is bit 1
                 self.state = __STATE_WAIT__ # change state to accepting new commands
+                self.err = 0 # not busy any longer
 
         # --state: unknown--
         else:
