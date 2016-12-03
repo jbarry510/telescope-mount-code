@@ -11,7 +11,7 @@ __cs_pins = []
 # references to the buses available to us- a dummy and four real buses
 __spi_buses = ['off', 'off', 'off', 'off', 'off']
 
-def init_bus (bus_num, baudrate=4000000, polarity=1, phase=1, firstbit='MSB'):
+def init_bus (bus_num, baudrate=1000000, polarity=1, phase=1, firstbit='MSB'):
     """ Turn on an SPI bus or reinitialize it if it was on already.
     Args:
         bus_num (int): Must be 1-4. Selects the SPI bus.
@@ -69,7 +69,7 @@ class SPIDevice:
             self.bus = bus_num
             self.cs = Pin(chip_select_pin, Pin.OUT_PP)
         # done
-    
+
     def send_recieve(self, send, send_len, recieve_len):
         """ A basic function using micropython's send and recieve SPI commands
             with added chip select.
@@ -80,12 +80,12 @@ class SPIDevice:
         Returns:
             data (int): The response from the SPI command
         """
-    
+
         # breaks 'send' into bytes using a shift and mask.
         data_bytes = [(send>>8*(send_len-byte-1))&0xff for byte in range(0,send_len)]
         # prepare to fill this
         recv_bytes = []
-        
+
         # send data byte by byte
         for byte in data_bytes:
             self.__send_byte(byte)
@@ -95,7 +95,7 @@ class SPIDevice:
             recv_bytes.append(self.__read_byte())
             pyb.udelay(1)
             #print (recv_bytes[byte])
-        
+
         # convert recieved bytes into a single number
         return_data = 0
         for byte in range(0,recieve_len):
@@ -104,7 +104,7 @@ class SPIDevice:
             # add the new byte in
             return_data += recv_bytes[byte]
         return return_data
-    
+
     # sender helper
     def __send_byte (self, byte):
         self.cs.value(0)
@@ -126,10 +126,10 @@ class __DummyBus:
     def send_recieve(self, data, send_len, recv_len):
         print ("faked Send: ", hex(data))
         return recv(recv_len)
-    
+
     def send(self, byte):
         print ("Faked Send: ", format(byte, '02X'))
-    
+
     def recv(self, length):
         print("faked Recieve ", length, " bytes.")
         faux_data = 0*range(0,length)
