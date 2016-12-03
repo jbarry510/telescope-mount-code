@@ -325,8 +325,15 @@ class L6470:
             status (int): the two-byte value of the register.
         """
         status = self.spi.send_recieve(0b11010000,1,2)
-        if not verbose:
-            return status
+        if verbose:
+            self.print_status(status)
+        return status
+    
+    def print_status (self, status):
+        """ Formatted printing of status codes for the driver.
+        Args:
+            status (int): the code returned by a GetStatus call.
+        """
         # === ELSE BEGIN HORROR ===
         # check error flags
         print ("Driver Status: ")#, bin(status))
