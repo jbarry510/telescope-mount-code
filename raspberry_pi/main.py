@@ -5,10 +5,9 @@ The main code to run on Raspberry Pi.
 
 # === IMPORTS ===
 import time
-import usb.core
-import usb.util
-from BNO055 import BNO055
-import ephem
+import serial
+# from BNO055 import BNO055
+# import ephem
 from kbhit import KBHit
 
 # === CONSTANTS ===
@@ -39,7 +38,7 @@ class Main_Task:
         self._state = STATE_INIT
         self._error = NO_ERROR
         self._imu = None
-        self._ep = None
+        self._dev = None
         self._obs = None
         self._key_checker = None
         self._alt = 0
@@ -64,31 +63,17 @@ class Main_Task:
         if self._state == STATE_INIT:
 
             # Sets up IMU for verifying direction of scope
-            self._imu = BNO055()
-            # Checks if IMU object was created
-            if self._imu is None:
-                raise ValueError('BNO055 IMU not connected')
-            self._imu.begin()
+            # self._imu = BNO055()
+            # # Checks if IMU object was created
+            # if self._imu is None:
+            #     raise ValueError('BNO055 IMU not connected')
+            # self._imu.begin()
 
-            # Connects to stepper motor driver board
-            # Find the device
-            dev = usb.core.find(idVendor=0xf055, idProduct=0x9800)
-            # Checks if device was found
-            if dev is None:
-                raise ValueError('Driver board not found')
-            # Set active configuration
-            dev.set_configuration()
-            cfg = dev.get_active_configuration()
-            intf = cfg[(0, 0)]
-            # Get endpoint instance
-            self._ep = usb.util.find_descriptor(
-                       intf,
-                       custom_match=(lambda e:
-                                     usb.util.endpoint_direction
-                                     (e.bEndpointAddress) ==
-                                     usb.util.ENDPOINT_OUT))
-            # Checks if endpoint was created
-            assert self._ep is not None
+            # Connects to stepper motor driver board via serial port
+            try:
+                self._dev = serial.Serial('/dev/ttyACM0', baudrate=115200)
+            except serial.serialutil.SerialException:
+                print("Unable to connect to driver board")
 
             # Prints messages and creates a keypress checker
             print("Initialization done...")
@@ -107,7 +92,7 @@ class Main_Task:
         elif self._state == STATE_CMD_PROCESS:
 
             # Waits for user to input
-            cmd = input("Enter a command: ")
+            cmd = raw_input("Enter a command: ")
             split_cmd = cmd.split()
 
             if split_cmd[0] == "cal":
@@ -115,9 +100,9 @@ class Main_Task:
                     # Creates an observer for computation of altitude and 
                     # azimuth calculation
                     self._obs = ephem.Observer()
-                    lon = input("Enter longitude of current position: ")
-                    lat = input("Enter latitude of current position: ")
-                    elev = input("Enter elevation at current position: ")
+                    lon = raw_input("Enter longitude of current position: ")
+                    lat = raw_input("Enter latitude of current position: ")
+                    elev = raw_input("Enter elevation at current position: ")
                     self._obs.lon = lon
                     self._obs.lat = lat
                     self._obs.elevation = elev
