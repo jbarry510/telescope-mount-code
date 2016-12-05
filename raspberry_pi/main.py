@@ -125,6 +125,8 @@ class Main_Task:
                     self._state = STATE_MOVE_WAIT
                 else:
                     print("Not a valid target")
+            elif split_cmd[0] == "test":
+                self._dev.write(split_cmd[1] + '\n')
             else:
                 print("Not a valid command entry")
 

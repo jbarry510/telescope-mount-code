@@ -24,7 +24,7 @@ __STATE_BUSY__ = 3
 
 
 # === FUNCTIONS AND CLASSES ===
-#def load_config_data ():
+# def load_config_data ():
 #    """ Loads config data from the uSD card for the motors.
 #    """
 #    pass # TODO
