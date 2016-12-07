@@ -105,7 +105,7 @@ class Main_Task:
         elif self._state == STATE_CMD_PROCESS:
 
             # Waits for user to input
-            cmd = raw_input("Enter a command: ")
+            cmd = raw_input("\nEnter a command: ")
             split_cmd = cmd.split()
 
             if split_cmd[0] == "cal":
@@ -239,14 +239,15 @@ class Main_Task:
             confirm = raw_input('Is this position correct? [y/n]')
             if confirm.lower() == 'n':
                 print('Please enter manual slew adjustments.')
-                # TODO alignment via panning controls
-                new_align = self._imu.read_euler()
-                self._polar_correction = new_align - self._euler_ang
-                self._euler_ang = new_align
+                align_cmd = raw_input('>')
+                while not (align_cmd == 'done'):
+                    self._dev.write(align_cmd + '\r')
+                    self._euler_ang = self._imu.read_euler()
+                    align_cmd = raw_input('\n>')
             print('Saving alignment...')
-            self._dev.write('azi:home set')
+            self._dev.write('azi:home set\r')
             time.sleep(0.001)
-            self._dev.write('alt:home set')
+            self._dev.write('alt:home set\r')
             time.sleep(0.001)
             print('Alignment finished.')
             self._state = STATE_CMD_WAIT
