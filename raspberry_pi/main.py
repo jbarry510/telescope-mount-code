@@ -10,30 +10,32 @@ from datetime import datetime as date
 from BNO055 import BNO055
 try:
     import ephem
+    import ephem.stars
 except ImportError:
-    print("Pyephem not installed must use manual commands")
+    print("PyEphem not installed, must use manual commands")
 from kbhit import KBHit
 
 # === CONSTANTS ===
 LOOP_DELAY = 0.1  # [sec], number of seconds to wait between loops
 # WAIT_DELAY = 5
 
-STATE_INIT = 0
-STATE_CMD_WAIT = 1
-STATE_CMD_PROCESS = 2
-STATE_IMU_READ = 3
-STATE_CAL_AZI = 4
-STATE_CAL_ALT = 5
-STATE_ERROR = 6
+STATE_INIT        = const(0)
+STATE_CMD_WAIT    = const(1)
+STATE_CMD_PROCESS = const(2)
+STATE_IMU_READ    = const(3)
+STATE_CAL_AZI     = const(4)
+STATE_CAL_ALT     = const(5)
+STATE_ALIGN       = const(6)
+STATE_ERROR       = const(7)
 
-NO_ERROR = 0
-ERROR_BAD_STATE = 1
+NO_ERROR          = const(0)
+ERROR_BAD_STATE   = const(1)
 
 
 # === FUNCTIONS AND CLASSES ===
 class Main_Task:
     """
-    Main task that the Raspberry Pi portion of the IMU telescope mount.
+    Main task for the Raspberry Pi portion of the IMU telescope mount.
     """
 
     def __init__(self):
@@ -63,8 +65,8 @@ class Main_Task:
         STATE_INIT        - Initializes IMU and connects to stepper driver board
                           via USB
         STATE_CMD_WAIT    - Waits for input commands from the user
-        STATE_CMD_PROCESS - Calculates the values needed to executed the user
-                          command
+        STATE_CMD_PROCESS - Calculates the values needed to execute the user's
+                          commands
         STATE_MOVE_WAIT   - Waits for the stepper driver board to complete any
                           movement commands
         STATE_IMU_READ    - Reads the IMU sensor for verifying 
@@ -125,6 +127,8 @@ class Main_Task:
                     self._state = STATE_CAL_ALT
                 elif split_cmd[1] == "azi":
                     self._state = STATE_CAL_AZI
+                elif split_cmd[1] == "polar":
+                    self._state = STATE_ALIGN                
                 else:
                     print("Not a valid calibration")
             elif split_cmd[0] == "goto":
@@ -156,6 +160,87 @@ class Main_Task:
                     self._imu_entry = 1
                     self._state = STATE_CMD_WAIT
 
+        elif self._state == STATE_CAL_ALT:
+            # TODO altitude calibration routine:
+            #   1. Get current IMU orientation (pitch is key)
+            #   2. Get altitude of Polaris (or other target) from Pyephem
+            #   3. Slew from IMU to target altitude
+            #   4. Confirm with user if heading is correct
+            #      A. Yes: Continue to [5]
+            #      B. No: Allow manual motion, save resulting correction.
+            #   5. send 'alt:home set' to the STM board
+            # Calibration done.
+            print('-- BETA --')
+            print('Starting altitude axis calibration...')
+            self._euler_ang = self._imu.read_euler()
+            if (self._azi_correction = None) or (self._euler_ang[0] - self._azi_correction != 0):
+                print('Azimuth axis may not be aligned. Calibrating azimuth first is recommended.')
+        #   # get target altitude from Pyephem
+        #   self._dev.write('alt:slew ' + str(altitude_target - self._euler_ang[1]) + '\r')
+            print('Is this alignment correct?')
+            # get some kind of yes / no from the user
+        #   if not confirm:
+        #       print('Please align scope manually.')
+        #       # do alignment
+        #       new_align = self._imu.read_euler()
+        #       self._alt_correction = (new_align - self._euler_ang)[1]
+        #       self._euler_ang = new_align
+            self._dev.write('alt:home set')
+            print('Altitude axis calibrated.')
+
+        elif self._state == STATE_CAL_AZI:
+            # TODO azimuth calibration routine:
+            #   1. Get current IMU orientation (heading is key)
+            #   2. Slew to IMU 0 heading (straight north)
+            #   3. Confirm with user if heading is correct
+            #      A. Yes: Continue to [4]
+            #      B. No: Allow manual motion, save resulting correction.
+            #   4. send 'azi:home set' to the STM board
+            # Calibration done.
+            print('-- BETA --')
+            print('Starting azimuth axis calibration...')
+            self._euler_ang = self._imu.read_euler()
+            self._dev.write('azi:slew' + str(-self._euler_ang[0]) + '\r')
+            # wait for the motor to stop...
+            print('Is this alignment correct?')
+            # get some kind of yes / no from the user
+        #   if not confirm:
+        #       print('Please align scope manually.')
+        #       # do alignment
+        #       new_align = self._imu.read_euler()
+        #       self._azi_correction = (new_align - self._euler_ang)[0]
+        #       self._euler_ang = new_align
+            self._dev.write('azi:home set')
+            print('Azimuth axis calibrated.')
+
+        elif self._state == STATE_ALIGN:
+            print('Starting polar alignment:')
+            self._euler_ang = self._imu.read_euler()
+            self._obs.date = date.now()
+            polaris = ephem.star("Polaris")
+            polaris.compute(self._obs)
+            pol_alt = polaris.alt * 180/ephem.pi # ephem.Angles become radians,
+            pol_azi = polaris.azi * 180/ephem.pi #   but we want degrees here.
+            print('Attempting to slew to Polaris...')
+            self._azi = pol_azi - self._euler_ang[0]
+            self._alt = pol_alt - self._euler_ang[1]
+            self._dev.write('azi:slew' + str(self._azi) + '\r')
+            self._dev.write('alt:slew' + str(self._alt) + '\r')
+            # TODO wait for arrival by checking IMU speed
+            
+            self._euler_ang = self._imu.read_euler() # update with the 'correct?' alignment
+            confirm = raw_input('Is this position correct? [y/n]')
+            if confirm.lower() == 'n':
+                print('Please enter manual slew adjustments.')
+                # TODO alignment via panning controls
+                new_align = self._imu.read_euler()
+                self._polar_correction = new_align - self._euler_ang
+                self._euler_ang = new_align
+            print('Saving alignment...')
+            self._dev.write('azi:home set')
+            self._dev.write('alt:home set')
+            print('Alignment finished.')
+        
         elif self._state == STATE_ERROR:
 
             if self._error == NO_ERROR:
