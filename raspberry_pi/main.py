@@ -19,17 +19,17 @@ from kbhit import KBHit
 LOOP_DELAY = 0.1  # [sec], number of seconds to wait between loops
 # WAIT_DELAY = 5
 
-STATE_INIT        = const(0)
-STATE_CMD_WAIT    = const(1)
-STATE_CMD_PROCESS = const(2)
-STATE_IMU_READ    = const(3)
-STATE_CAL_AZI     = const(4)
-STATE_CAL_ALT     = const(5)
-STATE_ALIGN       = const(6)
-STATE_ERROR       = const(7)
+STATE_INIT		  = 0
+STATE_CMD_WAIT    = 1
+STATE_CMD_PROCESS = 2
+STATE_IMU_READ    = 3
+STATE_CAL_AZI     = 4
+STATE_CAL_ALT     = 5
+STATE_ALIGN       = 6
+STATE_ERROR       = 7
 
-NO_ERROR          = const(0)
-ERROR_BAD_STATE   = const(1)
+NO_ERROR          = 0
+ERROR_BAD_STATE   = 1
 
 
 # === FUNCTIONS AND CLASSES ===
@@ -75,7 +75,7 @@ class Main_Task:
         if self._state == STATE_INIT:
 
             # Sets up IMU for verifying direction of scope
-            self._imu = BNO055()
+            self._imu = BNO055(serial_port='/dev/ttyAMA0', rst=18)
             # Checks if IMU object was created
             if self._imu is None:
                 raise ValueError('BNO055 IMU not connected')
@@ -174,7 +174,7 @@ class Main_Task:
             print('-- BETA --')
             print('Starting altitude axis calibration...')
             self._euler_ang = self._imu.read_euler()
-            if (self._azi_correction = None) or (self._euler_ang[0] - self._azi_correction != 0):
+            if (self._azi_correction == None) or (self._euler_ang[0] - self._azi_correction != 0):
                 print('Azimuth axis may not be aligned. Calibrating azimuth first is recommended.')
         #   # get target altitude from Pyephem
         #   self._dev.write('alt:slew ' + str(altitude_target - self._euler_ang[1]) + '\r')
@@ -187,7 +187,9 @@ class Main_Task:
         #       self._alt_correction = (new_align - self._euler_ang)[1]
         #       self._euler_ang = new_align
             self._dev.write('alt:home set')
+            time.sleep(0.001)
             print('Altitude axis calibrated.')
+            self._state = STATE_CMD_WAIT
 
         elif self._state == STATE_CAL_AZI:
             # TODO azimuth calibration routine:
@@ -212,7 +214,9 @@ class Main_Task:
         #       self._azi_correction = (new_align - self._euler_ang)[0]
         #       self._euler_ang = new_align
             self._dev.write('azi:home set')
+            time.sleep(0.001)
             print('Azimuth axis calibrated.')
+            self._state = STATE_CMD_WAIT
 
         elif self._state == STATE_ALIGN:
             print('Starting polar alignment:')
@@ -221,12 +225,14 @@ class Main_Task:
             polaris = ephem.star("Polaris")
             polaris.compute(self._obs)
             pol_alt = polaris.alt * 180/ephem.pi # ephem.Angles become radians,
-            pol_azi = polaris.azi * 180/ephem.pi #   but we want degrees here.
+            pol_azi = polaris.az * 180/ephem.pi #   but we want degrees here.
             print('Attempting to slew to Polaris...')
             self._azi = pol_azi - self._euler_ang[0]
             self._alt = pol_alt - self._euler_ang[1]
             self._dev.write('azi:slew' + str(self._azi) + '\r')
+            time.sleep(0.001)
             self._dev.write('alt:slew' + str(self._alt) + '\r')
+            time.sleep(0.001)
             # TODO wait for arrival by checking IMU speed
             
             self._euler_ang = self._imu.read_euler() # update with the 'correct?' alignment
@@ -239,8 +245,11 @@ class Main_Task:
                 self._euler_ang = new_align
             print('Saving alignment...')
             self._dev.write('azi:home set')
+            time.sleep(0.001)
             self._dev.write('alt:home set')
+            time.sleep(0.001)
             print('Alignment finished.')
+            self._state = STATE_CMD_WAIT
         
         elif self._state == STATE_ERROR:
 
