@@ -210,7 +210,7 @@ class Main_Task:
         #       new_align = self._imu.read_euler()
         #       self._azi_correction = (new_align - self._euler_ang)[0]
         #       self._euler_ang = new_align
-            self._dev.write('azi:home set')
+            self._dev.write('azi:home set\r')
             print('Azimuth axis calibrated.')
 
         elif self._state == STATE_ALIGN:
@@ -237,10 +237,10 @@ class Main_Task:
                 self._polar_correction = new_align - self._euler_ang
                 self._euler_ang = new_align
             print('Saving alignment...')
-            self._dev.write('azi:home set')
-            self._dev.write('alt:home set')
+            self._dev.write('azi:home set\r')
+            self._dev.write('alt:home set\r')
             print('Alignment finished.')
-        
+    
         elif self._state == STATE_ERROR:
 
             if self._error == NO_ERROR:
