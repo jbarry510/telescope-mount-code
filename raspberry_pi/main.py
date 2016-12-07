@@ -6,19 +6,25 @@ The main code to run on Raspberry Pi.
 # === IMPORTS ===
 import time
 import serial
-# from BNO055 import BNO055
-# import ephem
+from datetime import datetime as date
+from BNO055 import BNO055
+try:
+    import ephem
+except ImportError:
+    print("Pyephem not installed must use manual commands")
 from kbhit import KBHit
 
 # === CONSTANTS ===
 LOOP_DELAY = 0.1  # [sec], number of seconds to wait between loops
+# WAIT_DELAY = 5
 
 STATE_INIT = 0
 STATE_CMD_WAIT = 1
 STATE_CMD_PROCESS = 2
-STATE_MOVE_WAIT = 3
-STATE_IMU_READ = 4
-STATE_ERROR = 5
+STATE_IMU_READ = 3
+STATE_CAL_AZI = 4
+STATE_CAL_ALT = 5
+STATE_ERROR = 6
 
 NO_ERROR = 0
 ERROR_BAD_STATE = 1
@@ -37,7 +43,11 @@ class Main_Task:
         # Intializes class member variables
         self._state = STATE_INIT
         self._error = NO_ERROR
+        self._wait = 0
         self._imu = None
+        self._imu_entry = 1
+        self._pre_euler_ang = 0
+        self._euler_ang = 0
         self._dev = None
         self._obs = None
         self._key_checker = None
@@ -63,11 +73,11 @@ class Main_Task:
         if self._state == STATE_INIT:
 
             # Sets up IMU for verifying direction of scope
-            # self._imu = BNO055()
-            # # Checks if IMU object was created
-            # if self._imu is None:
-            #     raise ValueError('BNO055 IMU not connected')
-            # self._imu.begin()
+            self._imu = BNO055()
+            # Checks if IMU object was created
+            if self._imu is None:
+                raise ValueError('BNO055 IMU not connected')
+            self._imu.begin()
 
             # Connects to stepper motor driver board via serial port
             try:
@@ -100,44 +110,51 @@ class Main_Task:
                     # Creates an observer for computation of altitude and 
                     # azimuth calculation
                     self._obs = ephem.Observer()
-                    lon = raw_input("Enter longitude of current position: ")
-                    lat = raw_input("Enter latitude of current position: ")
-                    elev = raw_input("Enter elevation at current position: ")
+                    # lon = raw_input("Enter longitude of current position: ")
+                    # lat = raw_input("Enter latitude of current position: ")
+                    # elev = raw_input("Enter elevation at current position: ")
+
+                    # Test values
+                    lat = '35:16:57.9'       # +N
+                    lon = '-120:39:34.6'      # +E
+                    elev = 0
                     self._obs.lon = lon
                     self._obs.lat = lat
                     self._obs.elevation = elev
                 elif split_cmd[1] == "alt":
-                    pass
+                    self._state = STATE_CAL_ALT
                 elif split_cmd[1] == "azi":
-                    pass
+                    self._state = STATE_CAL_AZI
                 else:
                     print("Not a valid calibration")
             elif split_cmd[0] == "goto":
                 if split_cmd[1] == "moon":
+                    self._obs.date = date.now()
                     moon = ephem.Moon(self._obs)
-                    self._alt = moon.alt
-                    self._azi = moon.azi
-                    self._state = STATE_MOVE_WAIT
+                    self._alt = float(moon.alt) * 180/ephem.pi
+                    self._azi = float(moon.azi) * 180/ephem.pi
                 elif split_cmd[1] == "mars":
-                    mars = ephem.Mars(self._obs)
-                    self._alt = mars.alt
-                    self._azi = mars.azi
-                    self._state = STATE_MOVE_WAIT
+                    pass
                 else:
                     print("Not a valid target")
+                self._dev.write('azi:slew' + str(self._azi) + '\r')
+                self._dev.write('alt:slew' + str(self._alt) + '\r')
             elif split_cmd[0] == "test":
-                self._dev.write(split_cmd[1] + '\n')
+                self._dev.write(split_cmd[1] + '\r')
             else:
                 print("Not a valid command entry")
 
-        elif self._state == STATE_MOVE_WAIT:
-
-            self._state = STATE_IMU_READ
-
         elif self._state == STATE_IMU_READ:
+            if self._imu_entry == 1:
+                self._euler_ang = self._imu.read_euler()
+                self._imu_entry = 0
+            else:
+                self._pre_euler_ang = self._euler_ang
+                self._euler_ang = self._imu.read_euler()
 
-            euler_ang = self._imu.read_euler()
-            self._state = STATE_CMD_WAIT
+                if abs(self._euler_ang - self._pre_euler_ang) < [1, 1, 1]:
+                    self._imu_entry = 1
+                    self._state = STATE_CMD_WAIT
 
         elif self._state == STATE_ERROR:
 
@@ -150,7 +167,6 @@ class Main_Task:
         else:
             self._state == STATE_ERROR
             self._error == ERROR_BAD_STATE
-
 
 if __name__ == '__main__':
     main = Main_Task()
