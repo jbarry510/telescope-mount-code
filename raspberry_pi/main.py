@@ -11,7 +11,7 @@ import serial
 from kbhit import KBHit
 
 # === CONSTANTS ===
-LOOP_DELAY = 0.1  # [sec], number of seconds to wait between loops
+LOOP_DELAY = 0.25  # [sec], number of seconds to wait between loops
 
 STATE_INIT = 0
 STATE_CMD_WAIT = 1
@@ -71,7 +71,8 @@ class Main_Task:
 
             # Connects to stepper motor driver board via serial port
             try:
-                self._dev = serial.Serial('/dev/ttyACM0', baudrate=115200)
+                self._dev = serial.Serial(port='/dev/ttyACM0', baudrate=115200,
+                                          timeout = 2)
             except serial.serialutil.SerialException:
                 print("Unable to connect to driver board")
 
@@ -126,7 +127,9 @@ class Main_Task:
                 else:
                     print("Not a valid target")
             elif split_cmd[0] == "test":
-                self._dev.write(split_cmd[1] + '\n')
+                self._dev.write(split_cmd[1] + '\r')
+                mes_len = self._dev.in_waiting
+                print self._dev.read(mes_len)
             else:
                 print("Not a valid command entry")
 
