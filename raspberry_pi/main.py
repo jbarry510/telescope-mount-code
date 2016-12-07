@@ -186,7 +186,7 @@ class Main_Task:
         #       new_align = self._imu.read_euler()
         #       self._alt_correction = (new_align - self._euler_ang)[1]
         #       self._euler_ang = new_align
-            self._dev.write('alt:home set')
+            self._dev.write('alt:home set\r')
             time.sleep(0.001)
             print('Altitude axis calibrated.')
             self._state = STATE_CMD_WAIT
@@ -213,7 +213,7 @@ class Main_Task:
         #       new_align = self._imu.read_euler()
         #       self._azi_correction = (new_align - self._euler_ang)[0]
         #       self._euler_ang = new_align
-            self._dev.write('azi:home set')
+            self._dev.write('azi:home set\r')
             time.sleep(0.001)
             print('Azimuth axis calibrated.')
             self._state = STATE_CMD_WAIT
@@ -251,7 +251,6 @@ class Main_Task:
             time.sleep(0.001)
             print('Alignment finished.')
             self._state = STATE_CMD_WAIT
-        
         elif self._state == STATE_ERROR:
 
             if self._error == NO_ERROR:
