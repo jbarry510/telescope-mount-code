@@ -9,22 +9,21 @@
 #       Run a command
 
 
-# === THINGS WE PRETEND ARE CONSTANTS ===
-__LOOP_DELAY__    = const(100) # [us], number of microseconds to wait between main loops
-__ERR_FLAG_MASK__ = const(0b0111111000000000) # bit placement of error flags
-__ERR_CMD_MASK__  = const(0b0000000110000000) # bit placement of cmd error flags
+# === CONSTANTS ===
+_LOOP_DELAY    = const(100) # [us], number of microseconds to wait between main loops
+_ERR_FLAG_MASK = const(0b0111111000000000) # bit placement of error flags
+_ERR_CMD_MASK  = const(0b0000000110000000) # bit placement of cmd error flags
 
 # motor details
-STPD = 1.8 # steps per degree
-N_D  = 1   # teeth on driver gear
-N_F  = 1   # teeth on follower gear
+_STPD = const(18) # steps per 10 degrees ( const() requires an integer)
+_N_D  = const( 1) # teeth on driver gear
+_N_F  = const(26) # teeth on follower gear
 
 # state aliases
-if True:
-	STATE_ERR  = 3
-	STATE_BUSY = 2
-	STATE_IDLE = 1
-	STATE_INIT = 0
+_STATE_INIT = const(0)
+_STATE_IDLE = const(1)
+_STATE_BUSY = const(2)
+_STATE_ERR  = const(3)
 
 # === GLOBAL VARIABLES ===
 
@@ -44,63 +43,63 @@ class MotorTask:
         self._driver = driver_obj
         self._driver.ResetDevice()
         self._driver.GetStatus() # throw the first check away
-        self._state = STATE_INIT
+        self._state = _STATE_INIT
         self._err = 0
     
     def shut_off (self):
         self._driver.SoftHiZ()
-        self._state = STATE_IDLE
+        self._state = _STATE_IDLE
         self._err = 0
     
     def set_param (self, param_str, value):
         self._driver.GetStatus() # clear previous errors
         self._driver.SetParam(param_str, value)
         stat = self._driver.GetStatus()
-        if (stat & __ERR_CMD_MASK__) or ((stat & __ERR_FLAG_MASK__) != __ERR_FLAG_MASK__):
+        if (stat & _ERR_CMD_MASK) or ((stat & _ERR_FLAG_MASK) != _ERR_FLAG_MASK):
             self._driver.GetStatus() # try once more
             self._driver.SetParam(param_str, value)
             stat = self._driver.GetStatus()
-            if (stat & __ERR_CMD_MASK__) or ((stat & __ERR_FLAG_MASK__) != __ERR_FLAG_MASK__):
+            if (stat & _ERR_CMD_MASK) or ((stat & _ERR_FLAG_MASK) != _ERR_FLAG_MASK):
                 print('Error setting parameter for',self._name,'driver!')
                 print(self._driver.print_status(stat))
 
     def get_angle (self):
         step_count = self._driver.GetParam('ABS_POS')
         step_mode  = 2**(self._driver.GetParam('STEP_MODE') & 7)
-        return (1.0*N_D/N_F) * (step_count*STPD/step_mode)
+        return (1.0*_N_D/_N_F) * step_count * _STPD * (10.0/step_mode)
 
     def run_task (self, cmd_code='init'):
-        if self._state == STATE_INIT:
+        if self._state == _STATE_INIT:
             stat = self._driver.GetStatus()
             if stat == 0 or stat == 65535:
                 print('Cannot connect to',self._name,'- Is motor power on?')
                 return
-            if (stat & __ERR_CMD_MASK__) or ((stat & __ERR_FLAG_MASK__) != __ERR_FLAG_MASK__): # CMD ERR 0 = OK, FLAG ERR 1 = OK
+            if (stat & _ERR_CMD_MASK) or ((stat & _ERR_FLAG_MASK) != _ERR_FLAG_MASK): # CMD ERR 0 = OK, FLAG ERR 1 = OK
                 print('Init error for',self._name,':',stat,'. Trying again...')
-                self._state = STATE_INIT # something went wrong, report it and don't activate the motor.
+                self._state = _STATE_INIT # something went wrong, report it and don't activate the motor.
             else:
                 # brake just in case
                 print(self._name,'init finished successfully:',stat)
                 self._driver.SoftHiZ()
-                self._state = STATE_IDLE
+                self._state = _STATE_IDLE
         
         # --state: waiting for command--
-        elif self._state == STATE_IDLE:
+        elif self._state == _STATE_IDLE:
             # check the cmd_code to see what to do
             
             stat = self._driver.GetStatus()
-            if (stat & __ERR_CMD_MASK__) or ((stat & __ERR_FLAG_MASK__) != __ERR_FLAG_MASK__):
-                self._state = STATE_ERR
+            if (stat & _ERR_CMD_MASK) or ((stat & _ERR_FLAG_MASK) != _ERR_FLAG_MASK):
+                self._state = _STATE_ERR
                 print('Error in',self._name,'driver:','{0:016b}'.format(stat))
                 self._driver.print_status(stat)
                 self._err = stat
-
+            # go-to-angle command
             elif cmd_code.startswith('slew'):
                 try:
                     angle = float(cmd_code.replace('slew',''))
                     step_reg = self._driver.GetParam('STEP_MODE')
                     step_mode = 2**(step_reg & 7) # mask the upper bits
-                    step_value = int( angle * step_mode * (1.0*N_F / N_D) / STPD )
+                    step_value = int( angle * step_mode * (1.0*_N_F / _N_D) / (_STPD/10.0) )
                 except ValueError:
                     print('invalid angle given to',self._name,':',cmd_code.replace('slew',''))
                 else:
@@ -108,30 +107,50 @@ class MotorTask:
                     pyb.udelay(10)
                     self._driver.GoTo(step_value)
                     #print('going to',angle,'(',step_value,'sc)')
-                    self._state = STATE_BUSY
+                    self._state = _STATE_BUSY
+            # constant speed command
             elif cmd_code == 'track':
                 #print('tracking')
                 self._driver.SoftStop()
                 pyb.udelay(10)
                 self._driver.Run(1000,1)
+                self._state = _STATE_BUSY
+            # MARK position commands
+            elif cmd_code.startswith('mark'):
+                if 'set' in cmd_code:
+                    self.set_param('MARK',self._driver.GetParam('ABS_POS'))
+                else:
+                    self._driver.GoMark()
+                    self.state = _STATE_BUSY
+            # HOME position commands
+            elif cmd_code.startswith('home'):
+                if 'set' in cmd_code:
+                    self._driver.SoftStop()
+                    pyb.udelay(10)
+                    self.set_param('ABS_POS',0)
+                else:
+                    self._driver.GoHome()
+                    self.state = _STATE_BUSY
+            # motor halt command
             elif cmd_code == 'stop':
                 self._driver.SoftStop()
+            # low-power-draw mode command
             elif cmd_code == 'off':
                 self._driver.SoftHiZ()
         
         # --state: error has ocurred--
-        elif self._state == STATE_ERR:
+        elif self._state == _STATE_ERR:
             stat = self._driver.GetStatus()
-            if (not (stat & __ERR_CMD_MASK__)) and ((stat & __ERR_FLAG_MASK__) == __ERR_FLAG_MASK__):
-                self._state = STATE_IDLE
+            if (not (stat & _ERR_CMD_MASK)) and ((stat & _ERR_FLAG_MASK) == _ERR_FLAG_MASK):
+                self._state = _STATE_IDLE
                 self._err = 0
 
         # --state: executing command--
-        elif self._state == STATE_BUSY:
+        elif self._state == _STATE_BUSY:
             self._err = 2 # just notify that we're busy
             stat = self._driver.GetStatus()
             if stat & 1<<1: # BUSY flag is bit 1
-                self._state = STATE_IDLE # change state to accepting new commands
+                self._state = _STATE_IDLE # change state to accepting new commands
                 self._err = 0 # not busy any longer
 
         # --state: unknown--
@@ -139,7 +158,7 @@ class MotorTask:
             # unknown state somehow?! Brake and go back to waiting.
             print('Unknown state for', self._name, ', stopping motor!')
             self._driver.SoftHiZ()
-            self._state = STATE_IDLE
+            self._state = _STATE_IDLE
 
         return self._err
     # /run_task
@@ -165,7 +184,9 @@ def main ():
     
     print('** Setting motor parameters...')
     task_altitude.set_param('STEP_MODE',5) # sets the step mode to 1/32 uStep
+    task_altitude.set_param('MAX_SPEED',0x20) # set the max speed to 1/2 of the default
     task_azimuth.set_param ('STEP_MODE',5)
+    task_azimuth.set_param('MAX_SPEED',0x20)
     
     # load configuration data from the uSD card.
 #    load_config_data();
@@ -216,7 +237,7 @@ def main ():
                     usb_buf = bytearray(b'>')
                 else:
                     usb_buf.extend(char)
-            udelay(__LOOP_DELAY__)
+            udelay(_LOOP_DELAY)
     except KeyboardInterrupt:
         task_altitude.shut_off()
         task_azimuth.shut_off()
