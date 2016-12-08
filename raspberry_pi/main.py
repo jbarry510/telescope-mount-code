@@ -86,20 +86,13 @@ class Main_Task:
                                           timeout=5)
             except serial.serialutil.SerialException:
                 print("Unable to connect to driver board")
+            
+            print("IMU calibration status: " + str(self._imu.get_calibration_status()[0]))
 
-            if self._imu.get_calibration_status[0] == 3:
-                # Prints messages and creates a keypress checker
-                print("Initialization done...")
-                print("Press any key to start")
-                self._key_checker = KBHit()
-
-                # Transistions to next state
-                self._prev_state = STATE_INIT
-                self._state = STATE_CMD
-            else:
-                print("IMU not calibrated. Move sensor in a figure eight 
-                      motion.")
-
+            # Transistions to next state
+            self._prev_state = STATE_INIT
+            self._state = STATE_CMD
+            
         # Command processing state
         elif self._state == STATE_CMD:
             # Waits for user to input
@@ -125,8 +118,7 @@ class Main_Task:
                     self._obs.elevation = elev
                 elif split_cmd[1] == "polar":
                     if self._obs is None:
-                        print("\nLocation has not been set, run command: cal 
-                              obs first")
+                        print("\nLocation has not been set, run command: cal obs first")
                     else:
                         self._prev_state = STATE_CMD
                         self._state = STATE_ALIGN
@@ -138,15 +130,14 @@ class Main_Task:
                         self._obs.date = date.now()
                         moon = ephem.Moon(self._obs)
                         self._alt = float(moon.alt) * 180/ephem.pi
-                        self._azi = float(moon.azi) * 180/ephem.pi
+                        self._azi = float(moon.az) * 180/ephem.pi
                     else:
                         print("\nNot a valid target")
                     self._dev.write('azi:slew' + str(self._azi) + '\r')
                     time.sleep(0.001)
                     self._dev.write('alt:slew' + str(self._alt) + '\r')
                 else:
-                    print("\nDevice not calibrated, run command: cal polar 
-                          first")
+                    print("\nDevice not calibrated, run command: cal polar first")
             elif split_cmd[0] == "test":
                 self._dev.write(split_cmd[1] + '\r')
             else:
@@ -250,7 +241,7 @@ class Main_Task:
             else:
                 self._pre_euler_ang = self._euler_ang
                 self._euler_ang = self._imu.read_euler()
-                if abs(self._euler_ang - self._pre_euler_ang) < [0.1, 0.1, 0.1]:
+                if abs((self._euler_ang[0] - self._pre_euler_ang[0]) + (self._euler_ang[1] - self._pre_euler_ang[1]) + (self._euler_ang[2] - self._pre_euler_ang[2]))  < 0.1:
                     self._imu_entry = True
                     self._state = self._prev_state
                     self._prev_state = STATE_IMU_WAIT
@@ -276,4 +267,5 @@ if __name__ == '__main__':
             main.run_task()
             time.sleep(LOOP_DELAY)
     except KeyboardInterrupt:
-        pass
+        main._dev.write('azi:off\r')
+        main._dev.write('alt:off\r')
