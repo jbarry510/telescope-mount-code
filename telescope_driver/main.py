@@ -93,8 +93,8 @@ class MotorTask:
                 print('Error in',self._name,'driver:','{0:016b}'.format(stat))
                 self._driver.print_status(stat)
                 self._err = stat
-            # go-to-angle command
-            elif cmd_code.startswith('slew'):
+            # go-to-angle commands
+            elif cmd_code.startswith('slew'): # absolute angle
                 try:
                     angle = float(cmd_code.replace('slew',''))
                     step_reg = self._driver.GetParam('STEP_MODE')
@@ -108,6 +108,22 @@ class MotorTask:
                     self._driver.GoTo(step_value)
                     #print('going to',angle,'(',step_value,'sc)')
                     self._state = _STATE_BUSY
+            
+            elif cmd_code.startswith('turn'): # relative angle
+                try:
+                    angle     = float(cmd_code.replace('turn',''))
+                    step_reg  = self._driver.GetParam('STEP_MODE')
+                    step_mode = 2**(step_reg & 7)
+                    del_steps = angle * step_mode * (1.0*_N_F / _N_D) / ( _STPD/10.0)
+                    cur_steps = self._driver.GetParam('ABS_POS')
+                except ValueError:
+                    print('invalid angle given to',self._name,':',cmd_code.replace('turn',''))
+                else:
+                    self._driver.SoftStop()
+                    pyb.udelay(10)
+                    self._driver.GoTo( int(cur_steps + del_steps) )
+                    self._state = _STATE_BUSY
+                    
             # constant speed command
             elif cmd_code == 'track':
                 #print('tracking')
