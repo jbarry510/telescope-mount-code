@@ -13,23 +13,20 @@ try:
     import ephem.stars
 except ImportError:
     print("PyEphem not installed, must use manual commands")
-from kbhit import KBHit
 
 # === CONSTANTS ===
 LOOP_DELAY = 0.1  # [sec], number of seconds to wait between loops
-# WAIT_DELAY = 5
 
-STATE_INIT		  = 0
-STATE_CMD_WAIT    = 1
-STATE_CMD_PROCESS = 2
-STATE_IMU_READ    = 3
-STATE_CAL_AZI     = 4
-STATE_CAL_ALT     = 5
-STATE_ALIGN       = 6
-STATE_ERROR       = 7
+STATE_INIT      = 1
+STATE_CMD       = 2
+STATE_CAL_AZI   = 3
+STATE_CAL_ALT   = 4
+STATE_ALIGN     = 5
+STATE_IMU_WAIT  = 6
+STATE_ERROR     = 7
 
-NO_ERROR          = 0
-ERROR_BAD_STATE   = 1
+NO_ERROR        = 0
+ERROR_BAD_STATE = 1
 
 
 # === FUNCTIONS AND CLASSES ===
@@ -43,33 +40,35 @@ class Main_Task:
         Sets initial states and creates task variables
         """
         # Intializes class member variables
+        self._prev_state = None
         self._state = STATE_INIT
         self._error = NO_ERROR
-        self._wait = 0
         self._imu = None
-        self._imu_entry = 1
+        self._imu_entry = True
         self._pre_euler_ang = 0
         self._euler_ang = 0
         self._dev = None
         self._obs = None
         self._key_checker = None
         self._alt = 0
+        self._alt_calibrated = 0
         self._azi = 0
+        self._azi_calibrated = 0
 
     def run_task(self):
         """
+        TODO Make sure this reflects the actual state machine code TODO
         Executes task code running the Raspberry Pi controlled portion of the
         guided telescope mount. The task has a state machine structure.
 
         States:
-        STATE_INIT        - Initializes IMU and connects to stepper driver board
-                          via USB
-        STATE_CMD_WAIT    - Waits for input commands from the user
-        STATE_CMD_PROCESS - Calculates the values needed to execute the user's
-                          commands
-        STATE_MOVE_WAIT   - Waits for the stepper driver board to complete any
-                          movement commands
-        STATE_IMU_READ    - Reads the IMU sensor for verifying 
+        STATE_INIT        - Initializes IMU and connects to stepper driver 
+                          board via USB
+        STATE_CMD         - Waits for input commands from the user
+        STATE_CAL_ALT     -
+        STATE_CAL_AZI     -
+        STATE_ALIGN       -
+        STATE_IMU_WAIT    - Waits for IMU to stop changing values
         STATE_ERROR       - Handles errors and prints out error messages
         """
         if self._state == STATE_INIT:
@@ -84,26 +83,25 @@ class Main_Task:
             # Connects to stepper motor driver board via serial port
             try:
                 self._dev = serial.Serial(port='/dev/ttyACM0', baudrate=115200,
-                                          timeout = 2)
+                                          timeout=5)
             except serial.serialutil.SerialException:
                 print("Unable to connect to driver board")
 
-            # Prints messages and creates a keypress checker
-            print("Initialization done...")
-            print("Press any key to start")
-            self._key_checker = KBHit()
+            if self._imu.get_calibration_status[0] == 3:
+                # Prints messages and creates a keypress checker
+                print("Initialization done...")
+                print("Press any key to start")
+                self._key_checker = KBHit()
 
-            # Transistions to next state
-            self._state = STATE_CMD_WAIT
+                # Transistions to next state
+                self._prev_state = STATE_INIT
+                self._state = STATE_CMD
+            else:
+                print("IMU not calibrated. Move sensor in a figure eight 
+                      motion.")
 
-        elif self._state == STATE_CMD_WAIT:
-
-            # Waits for a keypress to move on to command entry
-            if self._key_checker.kbhit():
-                self._state = STATE_CMD_PROCESS
-
-        elif self._state == STATE_CMD_PROCESS:
-
+        # Command processing state
+        elif self._state == STATE_CMD:
             # Waits for user to input
             cmd = raw_input("\nEnter a command: ")
             split_cmd = cmd.split()
@@ -117,52 +115,46 @@ class Main_Task:
                     # lat = raw_input("Enter latitude of current position: ")
                     # elev = raw_input("Enter elevation at current position: ")
 
-                    # Test values
-                    lat = '35:16:57.9'       # +N
+                    # Test values (SLO)
+                    lat = '35:16:57.9'        # +N
                     lon = '-120:39:34.6'      # +E
                     elev = 0
+
                     self._obs.lon = lon
                     self._obs.lat = lat
                     self._obs.elevation = elev
-                elif split_cmd[1] == "alt":
-                    self._state = STATE_CAL_ALT
-                elif split_cmd[1] == "azi":
-                    self._state = STATE_CAL_AZI
                 elif split_cmd[1] == "polar":
-                    self._state = STATE_ALIGN                
+                    if self._obs is None:
+                        print("\nLocation has not been set, run command: cal 
+                              obs first")
+                    else:
+                        self._prev_state = STATE_CMD
+                        self._state = STATE_ALIGN
                 else:
-                    print("Not a valid calibration")
+                    print("\nNot a valid calibration command")
             elif split_cmd[0] == "goto":
-                if split_cmd[1] == "moon":
-                    self._obs.date = date.now()
-                    moon = ephem.Moon(self._obs)
-                    self._alt = float(moon.alt) * 180/ephem.pi
-                    self._azi = float(moon.azi) * 180/ephem.pi
-                elif split_cmd[1] == "mars":
-                    pass
+                if (self._alt_calibrated and self._azi_calibrated) == 1:
+                    if split_cmd[1] == "moon":
+                        self._obs.date = date.now()
+                        moon = ephem.Moon(self._obs)
+                        self._alt = float(moon.alt) * 180/ephem.pi
+                        self._azi = float(moon.azi) * 180/ephem.pi
+                    else:
+                        print("\nNot a valid target")
+                    self._dev.write('azi:slew' + str(self._azi) + '\r')
+                    time.sleep(0.001)
+                    self._dev.write('alt:slew' + str(self._alt) + '\r')
                 else:
-                    print("Not a valid target")
-                self._dev.write('azi:slew' + str(self._azi) + '\r')
-                self._dev.write('alt:slew' + str(self._alt) + '\r')
+                    print("\nDevice not calibrated, run command: cal polar 
+                          first")
             elif split_cmd[0] == "test":
                 self._dev.write(split_cmd[1] + '\r')
             else:
-                print("Not a valid command entry")
+                print("\nNot a valid command entry")
 
-        elif self._state == STATE_IMU_READ:
-            if self._imu_entry == 1:
-                self._euler_ang = self._imu.read_euler()
-                self._imu_entry = 0
-            else:
-                self._pre_euler_ang = self._euler_ang
-                self._euler_ang = self._imu.read_euler()
-
-                if abs(self._euler_ang - self._pre_euler_ang) < [1, 1, 1]:
-                    self._imu_entry = 1
-                    self._state = STATE_CMD_WAIT
-
+        # Calibration of altitude axis
         elif self._state == STATE_CAL_ALT:
-            # TODO altitude calibration routine:
+            # TODO altitude calibration routine (UPDATE DESCRIPTION):
             #   1. Get current IMU orientation (pitch is key)
             #   2. Get altitude of Polaris (or other target) from Pyephem
             #   3. Slew from IMU to target altitude
@@ -171,28 +163,24 @@ class Main_Task:
             #      B. No: Allow manual motion, save resulting correction.
             #   5. send 'alt:home set' to the STM board
             # Calibration done.
-            print('-- BETA --')
-            print('Starting altitude axis calibration...')
-            self._euler_ang = self._imu.read_euler()
-            if (self._azi_correction == None) or (self._euler_ang[0] - self._azi_correction != 0):
-                print('Azimuth axis may not be aligned. Calibrating azimuth first is recommended.')
-        #   # get target altitude from Pyephem
-        #   self._dev.write('alt:slew ' + str(altitude_target - self._euler_ang[1]) + '\r')
-            print('Is this alignment correct?')
-            # get some kind of yes / no from the user
-        #   if not confirm:
-        #       print('Please align scope manually.')
-        #       # do alignment
-        #       new_align = self._imu.read_euler()
-        #       self._alt_correction = (new_align - self._euler_ang)[1]
-        #       self._euler_ang = new_align
-            self._dev.write('alt:home set\r')
-            time.sleep(0.001)
-            print('Altitude axis calibrated.')
-            self._state = STATE_CMD_WAIT
 
+            print('\nStarting altitude axis calibration...')
+            self._euler_ang = self._imu.read_euler()
+            self._dev.write('alt:slew ' + str(-self._euler_ang[1]) + '\r')
+            if self._prev_state == STATE_IMU_WAIT:
+                self._dev.write('alt:home set\r')
+                time.sleep(0.001)
+                print('\nAltitude axis calibrated.')
+                self._alt_calibrated = 1
+                self._prev_state = STATE_CAL_ALT
+                self._state = STATE_CAL_AZI
+            else:
+                self._prev_state = STATE_CAL_ALT
+                self._state = STATE_IMU_WAIT
+
+        # Calibration of azimuth axis
         elif self._state == STATE_CAL_AZI:
-            # TODO azimuth calibration routine:
+            # TODO azimuth calibration routine (UPDATE DESCRIPTION):
             #   1. Get current IMU orientation (heading is key)
             #   2. Slew to IMU 0 heading (straight north)
             #   3. Confirm with user if heading is correct
@@ -200,69 +188,87 @@ class Main_Task:
             #      B. No: Allow manual motion, save resulting correction.
             #   4. send 'azi:home set' to the STM board
             # Calibration done.
-            print('-- BETA --')
-            print('Starting azimuth axis calibration...')
+
+            print('\nStarting azimuth axis calibration...')
             self._euler_ang = self._imu.read_euler()
             self._dev.write('azi:slew' + str(-self._euler_ang[0]) + '\r')
-            # wait for the motor to stop...
-            print('Is this alignment correct?')
-            # get some kind of yes / no from the user
-        #   if not confirm:
-        #       print('Please align scope manually.')
-        #       # do alignment
-        #       new_align = self._imu.read_euler()
-        #       self._azi_correction = (new_align - self._euler_ang)[0]
-        #       self._euler_ang = new_align
-            self._dev.write('azi:home set\r')
-            time.sleep(0.001)
-            print('Azimuth axis calibrated.')
-            self._state = STATE_CMD_WAIT
+            if self._prev_state == STATE_IMU_WAIT:
+                self._dev.write('azi:home set\r')
+                time.sleep(0.001)
+                print('\nAzimuth axis calibrated.')
+                self._azi_calibrated = 1
+                self._state = STATE_ALIGN
+            else:
+                self._prev_state = STATE_CAL_AZI
+                self._state = STATE_IMU_WAIT
 
+        # Overall calibration procedure state
         elif self._state == STATE_ALIGN:
-            print('Starting polar alignment:')
-            self._euler_ang = self._imu.read_euler()
-            self._obs.date = date.now()
-            polaris = ephem.star("Polaris")
-            polaris.compute(self._obs)
-            pol_alt = polaris.alt * 180/ephem.pi # ephem.Angles become radians,
-            pol_azi = polaris.az * 180/ephem.pi #   but we want degrees here.
-            print('Attempting to slew to Polaris...')
-            self._azi = pol_azi - self._euler_ang[0]
-            self._alt = pol_alt - self._euler_ang[1]
-            self._dev.write('azi:slew' + str(self._azi) + '\r')
-            time.sleep(0.001)
-            self._dev.write('alt:slew' + str(self._alt) + '\r')
-            time.sleep(0.001)
-            # TODO wait for arrival by checking IMU speed
-            
-            self._euler_ang = self._imu.read_euler() # update with the 'correct?' alignment
-            confirm = raw_input('Is this position correct? [y/n]')
-            if confirm.lower() == 'n':
-                print('Please enter manual slew adjustments.')
-                align_cmd = raw_input('>')
-                while not (align_cmd == 'done'):
-                    self._dev.write(align_cmd + '\r')
-                    self._euler_ang = self._imu.read_euler()
-                    align_cmd = raw_input('\n>')
-            print('Saving alignment...')
-            self._dev.write('azi:home set\r')
-            time.sleep(0.001)
-            self._dev.write('alt:home set\r')
-            time.sleep(0.001)
-            print('Alignment finished.')
-            self._state = STATE_CMD_WAIT
-        elif self._state == STATE_ERROR:
+            if self._prev_state == STATE_CMD:
+                print('\nStarting polar alignment calibration:')
+                self._prev_state = STATE_ALIGN
+                self._state = STATE_CAL_ALT
+            elif self._prev_state == STATE_CAL_AZI:
+                self._euler_ang = self._imu.read_euler()
+                self._obs.date = date.now()
+                polaris = ephem.star("Polaris")
+                polaris.compute(self._obs)
+                pol_alt = polaris.alt * 180/ephem.pi
+                pol_azi = polaris.az * 180/ephem.pi
+                print('\nAttempting to slew to Polaris...')
+                self._azi = pol_azi - self._euler_ang[0]
+                self._alt = pol_alt - self._euler_ang[1]
+                self._dev.write('azi:slew' + str(self._azi) + '\r')
+                time.sleep(0.001)
+                self._dev.write('alt:slew' + str(self._alt) + '\r')
+                time.sleep(0.001)
+                self._prev_state = STATE_ALIGN
+                self._state = STATE_IMU_WAIT
+            elif self._prev_state == STATE_IMU_WAIT:
+                confirm = raw_input('\nIs this position correct? [y/n]')
+                if confirm.lower() == 'n':
+                    print('\nPlease enter manual slew adjustments.')
+                    align_cmd = raw_input('>')
+                    while not (align_cmd == 'done'):
+                        self._dev.write(align_cmd + '\r')
+                        self._euler_ang = self._imu.read_euler()
+                        align_cmd = raw_input('\n>')
+                print('\nSaving alignment...')
+                self._dev.write('azi:home set\r')
+                time.sleep(0.001)
+                self._dev.write('alt:home set\r')
+                time.sleep(0.001)
+                print('\nAlignment finished.')
+                self._prev_state = STATE_ALIGN
+                self._state = STATE_CMD
 
+        # Waits for IMU data to stop changing (i.e. motors finished moving)
+        elif self._state == STATE_IMU_WAIT:
+            if self._imu_entry is True:
+                self._euler_ang = self._imu.read_euler()
+                self._imu_entry = False
+            else:
+                self._pre_euler_ang = self._euler_ang
+                self._euler_ang = self._imu.read_euler()
+                if abs(self._euler_ang - self._pre_euler_ang) < [0.1, 0.1, 0.1]:
+                    self._imu_entry = True
+                    self._state = self._prev_state
+                    self._prev_state = STATE_IMU_WAIT
+
+        # Error state for errors and stuff
+        elif self._state == STATE_ERROR:
             if self._error == NO_ERROR:
                 self._state = STATE_INIT
-
             elif self._error == ERROR_BAD_STATE:
                 print("Error: Unknown state reached, resetting device")
                 self._error = NO_ERROR
+
+        # Error if in a bad state
         else:
             self._state == STATE_ERROR
             self._error == ERROR_BAD_STATE
 
+# Starts state machine if file is executed
 if __name__ == '__main__':
     main = Main_Task()
     try:
