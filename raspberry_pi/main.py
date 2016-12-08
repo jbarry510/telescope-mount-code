@@ -19,11 +19,12 @@ LOOP_DELAY = 0.1  # [sec], number of seconds to wait between loops
 
 STATE_INIT      = 1
 STATE_CMD       = 2
-STATE_CAL_AZI   = 3
-STATE_CAL_ALT   = 4
-STATE_ALIGN     = 5
-STATE_IMU_WAIT  = 6
-STATE_ERROR     = 7
+STATE_CAL_IMU   = 3
+STATE_CAL_AZI   = 4
+STATE_CAL_ALT   = 5
+STATE_ALIGN     = 6
+STATE_IMU_WAIT  = 7
+STATE_ERROR     = 8
 
 NO_ERROR        = 0
 ERROR_BAD_STATE = 1
@@ -86,8 +87,6 @@ class Main_Task:
                                           timeout=5)
             except serial.serialutil.SerialException:
                 print("Unable to connect to driver board")
-            
-            print("IMU calibration status: " + str(self._imu.get_calibration_status()[0]))
 
             # Transistions to next state
             self._prev_state = STATE_INIT
@@ -116,12 +115,23 @@ class Main_Task:
                     self._obs.lon = lon
                     self._obs.lat = lat
                     self._obs.elevation = elev
+                elif split_cmd[1] == "imu":
+                    if self._imu.get_calibration_status()[0] > 0:
+                        print("\nIMU is calibrated")
+                    else:
+                        print('\nStarting IMU calibration...')
+                        self._prev_state = STATE_CMD
+                        self._state = STATE_CAL_IMU
+
                 elif split_cmd[1] == "polar":
                     if self._obs is None:
-                        print("\nLocation has not been set, run command: cal obs first")
+                        print("\nLocation has not been set, run command: cal obs")
                     else:
-                        self._prev_state = STATE_CMD
-                        self._state = STATE_ALIGN
+                        if self._imu.get_calibration_status()[0] > 0:
+                            self._prev_state = STATE_CMD
+                            self._state = STATE_ALIGN
+                        else:
+                            print("\nIMU calibration is off, run command: cal imu")
                 else:
                     print("\nNot a valid calibration command")
             elif split_cmd[0] == "goto":
@@ -142,6 +152,17 @@ class Main_Task:
                 self._dev.write(split_cmd[1] + '\r')
             else:
                 print("\nNot a valid command entry")
+
+        # Calibration of IMU
+        elif self._state == STATE_CAL_IMU:
+            cal = self._imu.get_calibration_status()
+            print('\nIMU system calibration status: ' + str(cal[0]))
+            print('\nGyro calibration status: ' + str(cal[1]))
+            print('\nAccel calibration status: ' + str(cal[2]))
+            print('\nMag calibration status: ' + str(cal[3]) + '\n')
+            if cal[0] > 0:
+                self._prev_state = STATE_CAL_IMU
+                self._state = STATE_CMD
 
         # Calibration of altitude axis
         elif self._state == STATE_CAL_ALT:
