@@ -1,6 +1,9 @@
-# Python module for an SPI bus on the STM64F4 microcontroller.
+""" @file stmspi.py
+This module implements an SPI bus in master mode, with chip select lines.
 
-""" This module implements an SPI bus in master mode, with chip select lines.
+    @authors Anthony Lombardi
+    @authors John Barry
+    @date 8 December 2016
 """
 
 import pyb
@@ -13,17 +16,15 @@ __spi_buses = ['off', 'off', 'off', 'off', 'off']
 
 def init_bus (bus_num, baudrate=1000000, polarity=1, phase=1, firstbit='MSB'):
     """ Turn on an SPI bus or reinitialize it if it was on already.
-    Args:
-        bus_num (int): Must be 1-4. Selects the SPI bus.
-        baudrate (opt int): Speed of transmission. Default is 4000000.
-        polarity (opt int): Must be 0 or 1. The idle level for the clock line.
-        phase (opt int): Must be 0 or 1. Sample data on the first or second clock
-            edge, respectively.
-        firstbit (opt int): Use 'LSB' or 'MSB' for least or most significant bit
-            first, respectively.
-    Returns:
-        0  if the bus was successfully (re)initialized.
-        -1 if there was an argument error.
+
+        @arg @c bus_num (int):  Must be 1-4. Selects the SPI bus.
+        @arg @c baudrate (int): Speed of transmission. Default is 4000000.
+        @arg @c polarity (int): Must be 0 or 1. The idle level for the clock line.
+        @arg @c phase (int):    Must be 0 or 1. Sample data on the first or second clock edge, respectively.
+        @arg @c firstbit (int): Use 'LSB' or 'MSB' for least or most significant bit first, respectively.
+
+        @returns @c 0  if the bus was successfully (re)initialized.
+        @returns @c -1 if there was an argument error.
     """
     if (bus_num > 4) or (bus_num < 0):
         print ("Invalid SPI bus number. Setup failed.")
@@ -43,7 +44,7 @@ def init_bus (bus_num, baudrate=1000000, polarity=1, phase=1, firstbit='MSB'):
         return -1
     if bus_num == 0:
         # dummy bus
-        __spi_buses[0] = __DummyBus()
+        __spi_buses[0] = DummyBus()
     else:
         __spi_buses[bus_num] = SPI(bus_num, SPI.MASTER, baudrate=baudrate,
                 polarity=polarity, phase=phase, firstbit=firstbit)
@@ -52,10 +53,9 @@ def init_bus (bus_num, baudrate=1000000, polarity=1, phase=1, firstbit='MSB'):
 class SPIDevice:
     def __init__(self, bus_num, chip_select_pin):
         """ Sets up a device to use one of the SPI buses.
-        Args:
-            bus_num (int): Must be 0-4. Selects a bus to use, where 0 is a fake
-                bus for testing.
-            chip_select_pin (obj): The pin on the board to use as chip select.
+
+            @arg @c bus_num (int):         Must be 0-4. Selects a bus to use, where 0 is a fake bus for testing.
+            @arg @c chip_select_pin (obj): The pin on the board to use as chip select.
         """
         if __spi_buses[bus_num] == 'off':
             print ("SPI bus ", bus_num, " was off. Using default setup.")
@@ -73,12 +73,12 @@ class SPIDevice:
     def send_recieve(self, send, send_len, recieve_len):
         """ A basic function using micropython's send and recieve SPI commands
             with added chip select.
-        Args:
-            send (int): The integer amount for the command you want to send
-            send_len (int): The number of bytes being sent in the command
-            recieve_len (int): The number of bytes you want to read
-        Returns:
-            data (int): The response from the SPI command
+
+            @arg @c send (int):        The integer amount for the command you want to send
+            @arg @c send_len (int):    The number of bytes being sent in the command
+            @arg @c recieve_len (int): The number of bytes you want to read
+
+            @return @c data (int):     The response from the SPI command
         """
 
         # breaks 'send' into bytes using a shift and mask.
@@ -105,6 +105,8 @@ class SPIDevice:
             return_data += recv_bytes[byte]
         return return_data
 
+## @privatesecton
+
     # sender helper
     def __send_byte (self, byte):
         self.cs.value(0)
@@ -122,15 +124,24 @@ class SPIDevice:
         self.cs.value(1)
         return (data[0])
 
-class __DummyBus:
+class DummyBus:
+    """ A simulated SPI bus with no hardware.
+            Useful for testing, but recieves 0.
+    """
     def send_recieve(self, data, send_len, recv_len):
+        """ A fake command that imitates SPIDevice.
+        """
         print ("faked Send: ", hex(data))
         return recv(recv_len)
 
     def send(self, byte):
+        """ A fake command that imitates SPIDevice.
+        """
         print ("Faked Send: ", format(byte, '02X'))
 
     def recv(self, length):
+        """ A fake command that imitates SPIDevice.
+        """
         print("faked Recieve ", length, " bytes.")
         faux_data = 0*range(0,length)
         return faux_data

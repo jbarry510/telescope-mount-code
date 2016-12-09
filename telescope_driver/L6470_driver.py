@@ -1,19 +1,14 @@
-# Python module for L6470 stepper driver board interface.
+""" @file L6470_driver.py
+This module implements the command set of the L6470 stepper driver.
 
-""" This module implements the command set of the L6470 stepper driver.
-
-Example:
-    ...
-
-Attributes:
-    ...
-
-
+    @authors Anthony Lombardi
+    @authors John Barry
+    @date 8 December 2016
 """
 from math import ceil as math_ceil
 
 class L6470:
-    """ This class represents an L6470 stepper driver.
+    """ @details This class represents an L6470 stepper driver.
             Contains representations of all valid commands,
             as well as dictionaries for the register addresses
             and the contents of the STATUS register.
@@ -78,39 +73,39 @@ class L6470:
     
     # === CORE FUNCTIONS ===
     """ Create a new L6470 instance.
-        Args:
-            spi_handler (obj): reference to the SPI driver this chip will use.
-        Returns:
-            a new instance of an L6470 object.
+
+           @arg @c spi_handler (obj): reference to the SPI driver this chip will use.
+
+           @returns a new instance of an L6470 object.
     """
     def __init__(self, spi_handler):
+        """ Create a new L6470 object.
+
+        @arg @c spi_handler The SPI device to use. Guaranteed to work with stmspi::SPIDevice or stmspi::DummyBus.
+        """
         self.spi = spi_handler
         if not hasattr(self.spi,'send_recieve'):
             print ('Invalid SPI object.')
             raise AttributeError
     
     def __del__(self):
-        # stuff to do if/when this instance is being deleted
+        """ Automatically called when the instance is deleted.
+                Stops the attached motor as a safety precaution.
+        """
         self.HardHiZ() # stop motors ASAP, for safety
-    
-    def test_function(self):
-        print ("test passed.")
-    
-    # === L6470 HELPER FUNCTIONS ===
-    
     
     # === L6470 FUNCTION WRAPPERS ===
     def Nop (self):
-        """ No-Operation command. Does nothing.
+        """ No-Operation command. The driver will not react.
         """
         # ze goggles
         self.spi.send_recieve(0,1,0)
     
     def SetParam (self, register, value):
         """ Writes the value <param> to the register named <register>.
-        Args:
-            register (string): A name corresponding to an entry in REGISTER_DICT.
-            value (int): The new value to write to that register.
+
+           @arg @c register (string): A name corresponding to an entry in REGISTER_DICT.
+           @arg @c value (int): The new value to write to that register.
         """
         regdata = L6470.REGISTER_DICT[register]
         send_len = math_ceil(regdata[1]/8)
@@ -119,10 +114,10 @@ class L6470:
     
     def GetParam (self, register):
         """ Reads the value of the register named <register>.
-        Args:
-            register (string): A name corresponding to an entry in REGISTER_DICT.
-        Returns:
-            value (byte array): The contents of the selected register.
+
+            @arg @c register (string): A name corresponding to an entry in REGISTER_DICT.
+
+            @return @c value (byte array): The contents of the selected register.
         """
         regdata = L6470.REGISTER_DICT[register]
         cmd = 0b00100000 + regdata[0]
@@ -135,12 +130,12 @@ class L6470:
         """ Sets the target <speed> and <direction>. BUSY flag is low until the
                 speed target is reached, or the motor hits MAX/MIN_SPEED. Can be
                 given at any time and runs immediately.
-        Args:
-            speed (int): The target speed. Must be positive.
-            direction (int): Direction to rotate. Must be 1 or 0.
-        Returns:
-            -1 if the direction or speed were invalid.
-             0 if the command ran successfully.
+
+            @arg @c speed (int): The target speed. Must be positive.
+            @arg @c direction (int): Direction to rotate. Must be 1 or 0.
+
+            @returns @c -1 if the direction or speed were invalid.
+            @returns @c  0 if the command ran successfully.
         """
         if (direction != 1) and (direction != 0):
             return -1 # invalid argument
@@ -159,11 +154,11 @@ class L6470:
                 direction. BUSY flag does not go low in this mode, but the
                 command can only be called when the motor is stopped-
                 NOTPERF_CMD flag will raise otherwise.
-        Args:
-            direction (int): Direction to rotate. Must be 1 or 0.
-        Returns:
-            -1 if the direction argument was invalid.   
-             0 if the command ran successfully.
+
+            @arg @c direction (int): Direction to rotate. Must be 1 or 0.
+
+            @returns @c -1 if the direction argument was invalid.   
+            @returns @c  0 if the command ran successfully.
         """
         if (direction != 1) and (direction != 0):
             return -1 # unpermitted behavior
@@ -175,12 +170,12 @@ class L6470:
                 goes low until all steps have happened. This command cannot be
                 run if the motor is running- NOTPERF_CMD flag will raise
                 otherwise.
-        Args:
-            steps (int): the number of (micro)steps to perform.
-            direction (int): The direction to rotate. Must be 1 or 0.
-        Returns:
-            -1 if the direction argument was invalid.   
-             0 if the command ran successfully.
+
+            @arg @c steps (int): the number of (micro)steps to perform.
+            @arg @c direction (int): The direction to rotate. Must be 1 or 0.
+
+            @returns @c -1 if the direction argument was invalid.   
+            @returns @c  0 if the command ran successfully.
         """
         if (direction != 1) and (direction != 0):
             return -1 # unpermitted behavior
@@ -193,8 +188,8 @@ class L6470:
                 The BUSY flag goes low until the position is reached. This
                 command can only be run if the motor is stopped- the NOTPERF_
                 CMD flag will raise otherwise.
-        Args:
-            position (int): the absolute position to rotate to.
+
+            @arg @c position (int): the absolute position to rotate to.
         """
         self.spi.send_recieve(0b01100000,1,0)
         self.spi.send_recieve(position,3,0)
@@ -204,12 +199,12 @@ class L6470:
                 This command works the same way GoTo() does, but the direction
                 of rotation is in the direction given by the argument, rather
                 than the minimum path.
-        Args:
-            position (int): the absolute position to rotate to.
-            direction (int): the direction to rotate in. Must be 1 or 0.
-        Returns:
-            -1 if the direction argument was invalid.   
-             0 if the command ran successfully.
+
+            @arg @c position (int): the absolute position to rotate to.
+            @arg @c direction (int): the direction to rotate in. Must be 1 or 0.
+
+            @returns @c -1 if the direction argument was invalid.   
+            @returns @c  0 if the command ran successfully.
         """
         if (direction != 1) and (direction != 0):
             return -1 # unpermitted behavior
@@ -224,13 +219,13 @@ class L6470:
                 instead of a SoftStop. This command pulls BUSY low until the
                 switch-on event occurs. This command can be given anytime and
                 immediately executes.
-        Args:
-            speed (int): the speed to rotate at. Must be positive.
-            action (int): 0 = reset ABS_POS register, 1 = copy ABS_POS into MARK.
-            direction (int): the direction to rotate in. Must be 1 or 0.
-        Returns:
-            -1 if the direction or action argument was invalid.   
-             0 if the command ran successfully.
+
+            @arg @c speed (int): the speed to rotate at. Must be positive.
+            @arg @c action (int): 0 = reset ABS_POS register, 1 = copy ABS_POS into MARK.
+            @arg @c direction (int): the direction to rotate in. Must be 1 or 0.
+
+            @returns @c -1 if the direction or action argument was invalid.   
+            @returns @c  0 if the command ran successfully.
         """
         if (action != 1) and (action != 0):
             return -1 # unpermitted behavior
@@ -245,12 +240,12 @@ class L6470:
                 optimization is enabled, the motor turns at 5 step/s. This
                 command keeps the BUSY flag low until the switch is released and
                 the motor stops.
-        Args:
-            action (int): 0 = reset ABS_POS register, 1 = copy ABS_POS into MARK.
-            direction (int): the direction to rotate in. Must be 1 or 0.
-        Returns:
-            -1 if the direction or action argument was invalid.   
-             0 if the command ran successfully.
+
+            @arg @c action (int): 0 = reset ABS_POS register, 1 = copy ABS_POS into MARK.
+            @arg @c direction (int): the direction to rotate in. Must be 1 or 0.
+
+            @returns @c -1 if the direction or action argument was invalid.   
+            @returns @c  0 if the command ran successfully.
         """
         if (action != 1) and (action != 0):
             return -1 # unpermitted behavior
@@ -319,10 +314,10 @@ class L6470:
         """ Returns the value of the STATUS register, and forces the system to
                 exit from any error state. This command does not reset the Hi-Z
                 or BUSY flags.
-        Args:
-            verbose (optional int): If this is not zero, the command will print.
-        Returns:
-            status (int): the two-byte value of the register.
+
+            @arg @c verbose (optional int): If this is not zero, the command will print.
+
+            @return @c status (int): the two-byte value of the register.
         """
         status = self.spi.send_recieve(0b11010000,1,2)
         if verbose:
@@ -331,8 +326,8 @@ class L6470:
     
     def print_status (self, status):
         """ Formatted printing of status codes for the driver.
-        Args:
-            status (int): the code returned by a GetStatus call.
+
+            @arg @c status (int): the code returned by a GetStatus call.
         """
         # === ELSE BEGIN HORROR ===
         # check error flags
