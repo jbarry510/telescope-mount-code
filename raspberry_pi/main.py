@@ -1,6 +1,10 @@
-# main.py for Raspberry Pi
-"""
+""" @file main.py
 The main code to run on Raspberry Pi.
+
+    @authors John Barry
+    @authors Anthony Lombardi
+
+    @date 6 December 2016
 """
 
 # === IMPORTS ===
@@ -38,7 +42,7 @@ class Main_Task:
 
     def __init__(self):
         """
-        Sets initial states and creates task variables
+        Sets initial states and creates task variables.
         """
         # Intializes class member variables
         self._prev_state = None
@@ -63,14 +67,13 @@ class Main_Task:
         guided telescope mount. The task has a state machine structure.
 
         States:
-        STATE_INIT        - Initializes IMU and connects to stepper driver 
-                          board via USB
-        STATE_CMD         - Waits for input commands from the user
-        STATE_CAL_ALT     -
-        STATE_CAL_AZI     -
-        STATE_ALIGN       -
-        STATE_IMU_WAIT    - Waits for IMU to stop changing values
-        STATE_ERROR       - Handles errors and prints out error messages
+        @li STATE_INIT     - Initializes IMU and connects to stepper driver board via USB
+        @li STATE_CMD      - Waits for input commands from the user
+        @li STATE_CAL_ALT  -
+        @li STATE_CAL_AZI  -
+        @li STATE_ALIGN    -
+        @li STATE_IMU_WAIT - Waits for IMU to stop changing values
+        @li STATE_ERROR    - Handles errors and prints out error messages
         """
         if self._state == STATE_INIT:
 
