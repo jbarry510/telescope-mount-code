@@ -1,12 +1,12 @@
-""" @file main.py
-The main code to run on Raspberry Pi.
-The main code consists of one task that handles the user interface with stepper motor driver board.
-
-@author John Barry
-@author Anthony Lombardi
-
-@date 6 December 2016
-"""
+## @file main.py
+#The main code to run on Raspberry Pi.
+#The main code consists of one task that handles the user interface with stepper motor driver board.
+#
+#@author John Barry
+#@author Anthony Lombardi
+#
+#@date 6 December 2016
+#
 
 # === IMPORTS ===
 import time
@@ -36,14 +36,14 @@ ERROR_BAD_STATE = 1
 
 
 # === FUNCTIONS AND CLASSES ===
+## @class Main_Task
+#    Main task for the Raspberry Pi portion of the IMU telescope mount.
+#
 class Main_Task:
-    """ @class Main_Task
-    Main task for the Raspberry Pi portion of the IMU telescope mount.
-    """
 
+    ## @brief  Creates a new Main_Task. Sets initial states and creates task variables.
+    #
     def __init__(self):
-        """ Creates a new Main_Task. Sets initial states and creates task variables.
-        """
         # Intializes class member variables
         self._prev_state = None
         self._state = STATE_INIT
@@ -60,19 +60,19 @@ class Main_Task:
         self._azi = 0
         self._azi_calibrated = 0
 
+    ## @brief  Executes task code running the Raspberry Pi controlled portion of the guided telescope mount. The task has a state machine structure.
+    #
+    # @par States
+    #        @li STATE_INIT     - Initializes IMU and connects to stepper driver board via USB
+    #        @li STATE_CMD      - Waits for input commands from the user and processes user input
+    #        @li STATE_CAL_IMU  - Prints IMU calibration status and waits until IMU is calibrated before exiting
+    #        @li STATE_CAL_ALT  - Sends command to move to zero altitude and waits until done moving
+    #        @li STATE_CAL_AZI  - Sends command to move to north and waits until done moving
+    #        @li STATE_ALIGN    - Handles overall calibration procedure flow
+    #        @li STATE_IMU_WAIT - Waits for IMU to stop changing values
+    #        @li STATE_ERROR    - Handles errors and prints out error messages
+    #
     def run_task(self):
-        """ Executes task code running the Raspberry Pi controlled portion of the guided telescope mount. The task has a state machine structure.
-
-        States:
-        @li STATE_INIT     - Initializes IMU and connects to stepper driver board via USB
-        @li STATE_CMD      - Waits for input commands from the user and processes user input
-        @li STATE_CAL_IMU  - Prints IMU calibration status and waits until IMU is calibrated before exiting
-        @li STATE_CAL_ALT  - Sends command to move to zero altitude and waits until done moving
-        @li STATE_CAL_AZI  - Sends command to move to north and waits until done moving
-        @li STATE_ALIGN    - Handles overall calibration procedure flow
-        @li STATE_IMU_WAIT - Waits for IMU to stop changing values
-        @li STATE_ERROR    - Handles errors and prints out error messages
-        """
         if self._state == STATE_INIT:
             # Sets up IMU for verifying direction of scope
             self._imu = BNO055(serial_port='/dev/ttyAMA0', rst=18)
@@ -91,7 +91,7 @@ class Main_Task:
             # Transistions to next state
             self._prev_state = STATE_INIT
             self._state = STATE_CMD
-            
+
         # Command processing state
         elif self._state == STATE_CMD:
             # Waits for user to input
@@ -101,7 +101,7 @@ class Main_Task:
             # Checks what command user has inputted
             if split_cmd[0] == "cal":
                 if split_cmd[1] == "obs":
-                    # Creates an observer for computation of altitude and 
+                    # Creates an observer for computation of altitude and
                     # azimuth calculation
                     self._obs = ephem.Observer()
                     # lon = raw_input("Enter longitude of current position: ")
@@ -154,7 +154,7 @@ class Main_Task:
                     self._dev.write('alt:slew' + str(self._alt) + '\r')
                 else:
                     print("\nDevice not calibrated, run command: cal polar first")
-    
+
             elif split_cmd[0] == "test":
                 # Allows user to input a string to send directly to board
                 # for debuggin purposes
@@ -284,7 +284,7 @@ class Main_Task:
 
         # Error state for errors and stuff
         elif self._state == STATE_ERROR:
-            # Checks if state machine has reached a bad state and resets 
+            # Checks if state machine has reached a bad state and resets
             # device if it has
             if self._error == NO_ERROR:
                 self._state = STATE_INIT

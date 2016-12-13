@@ -1,20 +1,41 @@
-""" @file main.py
-The main code to run on the STM32F411 at the heart of the IMU guide.
-
-@authors Anthony Lombardi
-@authors John Barry
-@date 8 December 2016
-"""
+## @file main.py
+#The main code to run on the STM32F411 at the heart of the IMU guide.
+#
+#@authors Anthony Lombardi
+#@authors John Barry
+#@date 8 December 2016
+#
 
 # === CONSTANTS ===
+## @var _LOOP_DELAY
+# @hideinitializer
+# @protected
 _LOOP_DELAY    = const(100) # [us], number of microseconds to wait between main loops
+## @var _ERR_FLAG_MASK
+# @hideinitializer
+# @protected
 _ERR_FLAG_MASK = const(0b0111111000000000) # bit placement of error flags
+## @var _ERR_CMD_MASK
+# @hideinitializer
+# @protected
 _ERR_CMD_MASK  = const(0b0000000110000000) # bit placement of cmd error flags
 
 # state aliases
+## @var _STATE_INIT
+# @hideinitializer
+# @protected
 _STATE_INIT = const(0)
+## @var _STATE_IDLE
+# @hideinitializer
+# @protected
 _STATE_IDLE = const(1)
+## @var _STATE_BUSY
+# @hideinitializer
+# @protected
 _STATE_BUSY = const(2)
+## @var _STATE_ERR
+# @hideinitializer
+# @protected
 _STATE_ERR  = const(3)
 
 # === FUNCTIONS AND CLASSES ===
@@ -24,17 +45,17 @@ _STATE_ERR  = const(3)
 #    pass # TODO
 # /load_config_data
 
+## @brief  The task class for motor drivers.
+#
 class MotorTask:
-    """ The task class for motor drivers.
-    """
+    ## @brief  Creates a new MotorTask. Sets initial states and creates task variables.
+    #
+    #        @arg @c driver_obj     The L6470 instance to control.
+    #        @arg @c step_degrees   The number of steps per degree for the motor.
+    #        @arg @c teeth_driver   The number of teeth on the attached gear.
+    #        @arg @c teeth_follower The number of teeth on the driven gear.
+    #
     def __init__(self, name, driver_obj, step_degrees=1.8, teeth_driver=1, teeth_follower=1):
-        """ Creates a new MotorTask. Sets initial states and creates task variables.
-
-        @arg @c driver_obj     The L6470 instance to control.
-        @arg @c step_degrees   The number of steps per degree for the motor.
-        @arg @c teeth_driver   The number of teeth on the attached gear.
-        @arg @c teeth_follower The number of teeth on the driven gear.
-        """
         self._name = name
         self._driver = driver_obj
         self._STPD = step_degrees
@@ -44,21 +65,21 @@ class MotorTask:
         self._driver.GetStatus() # throw the first check away
         self._state = _STATE_INIT
         self._err = 0
-    
+
+    ## @brief  Shut down the motor and wait for commands.
+    #
     def shut_off (self):
-        """ Shut down the motor and wait for commands.
-        """
         self._driver.SoftHiZ()
         self._state = _STATE_IDLE
         self._err = 0
-    
-    def set_param (self, param_str, value):
-        """ Wrapper for the L6470.SetParam function for the L6470 instance
-        being controlled by this MotorTask.
 
-        @arg @c param_str The name of the register to set.
-        @arg @c value     The new value for the register.
-        """
+    ## Wrapper for the L6470.SetParam function for the L6470 instance
+    #        being controlled by this MotorTask.
+    #
+    #        @arg @c param_str The name of the register to set.
+    #        @arg @c value     The new value for the register.
+    #
+    def set_param (self, param_str, value):
         self._driver.GetStatus() # clear previous errors
         self._driver.SetParam(param_str, value)
         stat = self._driver.GetStatus()
@@ -70,34 +91,34 @@ class MotorTask:
                 print('Error setting parameter for',self._name,'driver!')
                 print(self._driver.print_status(stat))
 
+    ## Uses the motor's gear ratio and the step mode to calculate
+    #        the current output position, in degrees.
+    #
+    #        @return @c angle The angle of the output shaft, in degrees.
+    #
     def get_angle (self):
-        """ Uses the motor's gear ratio and the step mode to calculate
-        the current output position, in degrees.
-
-        @return @c angle The angle of the output shaft, in degrees.
-        """
         step_count = self._driver.GetParam('ABS_POS')
         step_mode  = 2.0**(self._driver.GetParam('STEP_MODE') & 7)
         return (1.0*self._N_D/self._N_F) * step_count * self._STPD / step_mode
 
+    ## The state machine for the MotorTask.
+    #        Run this once per loop and update the argument from there.
+    #
+    #        The command code can be one of the following:
+    #        @li @c init          (re-)initialize this MotorTask.
+    #        @li @c slew @c #     Go to a position, in absolute degrees.
+    #        @li @c turn @c #     Go to a position, in relative degrees.
+    #        @li @c track         Turn at a constant rate.
+    #        @li @c mark @c [set] Go to the MARK position [set the current position as MARK].
+    #        @li @c home @c [set] Go to the HOME position [set the current position as HOME].
+    #        @li @c stop          Stop the motor, with a holding torque.
+    #        @li @c off           Set the motor driver to Hi-Z (coast) mode.
+    #
+    #        @arg @c cmd_code A string that represents the requested instruction.
+    #
+    #        @return @c error The error code. @c 0 if no error.
+    #
     def run_task (self, cmd_code='init'):
-        """ The state machine for the MotorTask.
-        Run this once per loop and update the argument from there.
-
-        The command code can be one of the following:
-        @li @c init          (re-)initialize this MotorTask.
-        @li @c slew @c #     Go to a position, in absolute degrees.
-        @li @c turn @c #     Go to a position, in relative degrees.
-        @li @c track         Turn at a constant rate.
-        @li @c mark @c [set] Go to the MARK position [set the current position as MARK].
-        @li @c home @c [set] Go to the HOME position [set the current position as HOME].
-        @li @c stop          Stop the motor, with a holding torque.
-        @li @c off           Set the motor driver to Hi-Z (coast) mode.
-
-        @arg @c cmd_code A string that represents the requested instruction.
-
-        @return @c error The error code. @c 0 if no error.
-        """
         if self._state == _STATE_INIT:
             stat = self._driver.GetStatus()
             if stat == 0 or stat == 65535:
@@ -111,11 +132,11 @@ class MotorTask:
                 print(self._name,'init finished successfully:',stat)
                 self._driver.SoftHiZ()
                 self._state = _STATE_IDLE
-        
+
         # --state: waiting for command--
         elif self._state == _STATE_IDLE:
             # check the cmd_code to see what to do
-            
+
             stat = self._driver.GetStatus()
             if (stat & _ERR_CMD_MASK) or ((stat & _ERR_FLAG_MASK) != _ERR_FLAG_MASK):
                 self._state = _STATE_ERR
@@ -137,7 +158,7 @@ class MotorTask:
                     self._driver.GoTo(step_value)
                     #print('going to',angle,'(',step_value,'sc)')
                     self._state = _STATE_BUSY
-            
+
             elif cmd_code.startswith('turn'): # relative angle
                 try:
                     angle     = float(cmd_code.replace('turn',''))
@@ -152,7 +173,7 @@ class MotorTask:
                     pyb.udelay(10)
                     self._driver.GoTo( int(cur_steps + del_steps) )
                     self._state = _STATE_BUSY
-                    
+
             # constant speed command
             elif cmd_code == 'track':
                 #print('tracking')
@@ -209,39 +230,39 @@ class MotorTask:
     # /run_task
 # /task_motor
 
+## The main logic for the script as a program.
+#    Handles importing modules and initializing global vars.
+#
 def main ():
-    """ The main logic for the script as a program.
-    Handles importing modules and initializing global vars.
-    """
     # modules we'll be using.
     from pyb import USB_VCP, Pin, delay, udelay
     import stmspi
     from L6470_driver import L6470
-    
+
     print('** PyScope booting...')
     delay(1000)
     print('** Initializing motors...')
-    
+
     # create the motor driver objects.
     task_altitude = MotorTask('altitude',L6470(stmspi.SPIDevice(2,Pin.cpu.B0 )))
     task_azimuth  = MotorTask('azimuth', L6470(stmspi.SPIDevice(2,Pin.cpu.B1 )))
     #task_focuser  = MotorTask('focuser', L6470(stmspi.SPIDevice(1,Pin.cpu.A15)))
-    
+
     print('** Setting motor parameters...')
     task_altitude.set_param('STEP_MODE',5) # sets the step mode to 1/32 uStep
     task_altitude.set_param('MAX_SPEED',0x20) # set the max speed to 1/2 of the default
     task_azimuth.set_param ('STEP_MODE',5)
     task_azimuth.set_param('MAX_SPEED',0x20)
-    
+
     # load configuration data from the uSD card.
 #    load_config_data();
-    
+
     # initialize USB link
     usb = USB_VCP()
     if not usb.isconnected():
         print('usb not connected?!')
     usb_buf = bytearray('>') # incoming text buffer
-    
+
     # init the command code vars
     cmd_alt = 'init'
     cmd_azi = 'init'
@@ -259,7 +280,7 @@ def main ():
             cmd_alt = 'wait'
             cmd_azi = 'wait'
             cmd_foc = 'wait'
-            
+
             # check for USB data and set new commands
             if usb.any():
                 char = usb.read(1) # read and parse 1 byte at a time
