@@ -1,5 +1,5 @@
-""" @file main.py
-The main code to run on Raspberry Pi.
+"""@file main.py
+The main code to run on Raspberry Pi. The main code consists of one task that handles the user interface with stepper motor driver board.
 
     @authors John Barry
     @authors Anthony Lombardi
@@ -36,7 +36,7 @@ ERROR_BAD_STATE = 1
 
 # === FUNCTIONS AND CLASSES ===
 class Main_Task:
-    """
+    """@class Main_Task
     Main task for the Raspberry Pi portion of the IMU telescope mount.
     """
 
@@ -61,17 +61,15 @@ class Main_Task:
         self._azi_calibrated = 0
 
     def run_task(self):
-        """
-        TODO Make sure this reflects the actual state machine code TODO
-        Executes task code running the Raspberry Pi controlled portion of the
-        guided telescope mount. The task has a state machine structure.
+        """@brief Executes task code running the Raspberry Pi controlled portion of the guided telescope mount. The task has a state machine structure.
 
         States:
         @li STATE_INIT     - Initializes IMU and connects to stepper driver board via USB
-        @li STATE_CMD      - Waits for input commands from the user
-        @li STATE_CAL_ALT  -
-        @li STATE_CAL_AZI  -
-        @li STATE_ALIGN    -
+        @li STATE_CMD      - Waits for input commands from the user and processes user input
+        @li STATE_CAL_IMU  - Prints IMU calibration status and waits until IMU is calibrated before exiting
+        @li STATE_CAL_ALT  - Sends command to move to zero altitude and waits until done moving
+        @li STATE_CAL_AZI  - Sends command to move to north and waits until done moving
+        @li STATE_ALIGN    - Handles overall calibration procedure flow
         @li STATE_IMU_WAIT - Waits for IMU to stop changing values
         @li STATE_ERROR    - Handles errors and prints out error messages
         """
