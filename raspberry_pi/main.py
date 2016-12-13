@@ -1,4 +1,4 @@
-"""@file main.py
+""" @file main.py
 The main code to run on Raspberry Pi. The main code consists of one task that handles the user interface with stepper motor driver board.
 
     @authors John Barry
@@ -36,7 +36,7 @@ ERROR_BAD_STATE = 1
 
 # === FUNCTIONS AND CLASSES ===
 class Main_Task:
-    """@class Main_Task
+    """ @class Main_Task
     Main task for the Raspberry Pi portion of the IMU telescope mount.
     """
 
@@ -61,7 +61,7 @@ class Main_Task:
         self._azi_calibrated = 0
 
     def run_task(self):
-        """@brief Executes task code running the Raspberry Pi controlled portion of the guided telescope mount. The task has a state machine structure.
+        """ @brief Executes task code running the Raspberry Pi controlled portion of the guided telescope mount. The task has a state machine structure.
 
         States:
         @li STATE_INIT     - Initializes IMU and connects to stepper driver board via USB
